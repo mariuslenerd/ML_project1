@@ -49,8 +49,10 @@ def compute_loss(y,tx,w) :
         the value of the square loss (a scalar) corresponding to input parameters w
     """
 
-    n = len(y)
-    return (1/2*n)*np.sum((y-tx@w)**2)
+    N = y.shape[0]
+    e = y - tx @ w
+    MSE_loss = 1 / (2*N) * (e.T @ e)
+    return MSE_loss
 
 def compute_mse_gradient(y,tx,w) : 
     """
@@ -70,7 +72,7 @@ def compute_mse_gradient(y,tx,w) :
     e = y- tx@w
     return -(tx.T@e)/n
 
-def gradient_descent(y,tx,initial_w, max_iters,gamma) : 
+def mean_squared_error_gd(y,tx,initial_w, max_iters,gamma) : 
     """
     Performs gradient descent with MSE loss and returns the last computed parameters 
     
@@ -95,7 +97,7 @@ def gradient_descent(y,tx,initial_w, max_iters,gamma) :
 
     return w,loss
 
-def stochastic_gradient_descent(y,tx,initial_w, max_iters, gamma) : 
+def mean_squared_error_sgd(y,tx,initial_w, max_iters, gamma) : 
     """
     Performs stochastic gradient descent (note that batch_size = 1, specified in the project description) using mse loss and returns the last computed parameters along with its associated loss
 
@@ -114,14 +116,14 @@ def stochastic_gradient_descent(y,tx,initial_w, max_iters, gamma) :
     w = initial_w
     loss = compute_loss(y,tx,w)
 
-    for n_iter,(mini_batch_y, mini_batch_tx) in enumerate(batch_iter(y,tx,batch_size,max_iters)) : 
+    for mini_batch_y, mini_batch_tx in batch_iter(y,tx,batch_size,max_iters): 
         grad = compute_mse_gradient(mini_batch_y,mini_batch_tx,w)
         w = w-gamma*grad
         loss = compute_loss(y,tx,w)
 
     return w,loss
 
-def ordinary_least_squares(y,tx) : 
+def least_squares(y,tx) : 
     """
     Performs the ordinary least squares regression algorithm and returns the best parameters, along with its associated loss
 
@@ -137,5 +139,64 @@ def ordinary_least_squares(y,tx) :
     loss = compute_loss(y,tx,w)
 
     return w,loss
+
+def compute_ridge_loss(y, tx, w, lambda_):
+    N = y.shape[0]
+    e = y - tx @ w
+    ridge_loss = 1 / (2*N) * (e.T @ e) + 0.5 * lambda_ * w.T @ w
+    return ridge_loss
+
+def ridge_regression(y, tx, lambda_):
+    N, D = tx.shape
+    A = tx.T @ tx + (N * lambda_) * np.eye(D)      
+    b = tx.T @ y                                   
+    w = np.linalg.solve(A, b)  
+    loss = compute_ridge_loss(y, tx, w, lambda_)
+    return w, loss
+# ----------- LOGISTIC REGRESSION -----------
+def sigmoid(z):
+    return 1 / ( 1 + np.exp(-z))
+
+def compute_logistic_loss(y, tx, w):
+    prediction = sigmoid(tx.T @ w)
+    loss = -np.mean(y * np.log(prediction + 1e-15) + (1-y) * np.log(1 - prediction + 1e-15))
+    return loss
+
+def compute_logistic_gradient(y, tx, w):
+    prediction = sigmoid(tx.T @ w)
+    return 1/N  * tx.T @ (prediction - y)
+
+def logistic_regression(y, tx, initial_w, max_iters, gamma):
+    w = initial_w
+    for _ in range(max_iters):
+        gradient = compute_logistic_gradient(y, tx, w)
+        w = w - gamma * gradient
+    loss = compute_logistic_loss(y, tx, w)
+    return w, loss
+
+# ---------- REGULARIZED LOGISTIC REGRESSION ----------
+
+def compute_reg_logistic_loss(y, tx, w, lambda_):
+    prediction = sigmoid(tx @ w)
+    cross_entropy_loss = -np.mean(y * np.log(prediction + 1e-15) + (1-y) * np.log(1 - prediction + 1e-15))
+    # TODO: Check if we should also add the regularization term on the bias ? If so remove [1:]
+    regularization = lambda_ * 0.5 * w.T[1:] @ w[1:]
+    return cross_entropy_loss + regularization
+
+def compute_reg_logistic_gradient(y, tx, w, lambda_):
+    N = y.shape[0]
+    prediction = sigmoid(tx @ w)
+    # TODO: Check if we should also add the regularization term on the bias ?  if so remove [1:]
+    gradient = 1/N  * tx.T @ (prediction - y)
+    gradient[1:] += lambda_ * w[1:]
+    return gradient
+
+def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
+    w = initial_w
+    for _ in range(max_iters):
+        gradient = compute_reg_logistic_gradient(y, tx, w, lambda_)
+        w = w - gamma * gradient
+    loss = compute_reg_logistic_loss(y, tx, w, lambda_)
+    return w, loss
 
 
