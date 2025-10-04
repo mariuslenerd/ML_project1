@@ -11,7 +11,7 @@ def remove_useless(data: np.ndarray, annotated_data: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: The data array with useless features removed.
     """
-    mask = annotated_data[:, 1] != 0               
+    mask = annotated_data[:, 0] != '0'               
     if mask.shape[0] != data.shape[1]:
         raise ValueError(f"Annotation length {mask.shape[0]} != n_features {data.shape[1]}")
     return data[:, mask] 
@@ -32,14 +32,88 @@ def read_annotated_csv(path, delimiter=',', skip_header=0 ):
         path,
         delimiter=",",
         skip_header=skip_header,
-        dtype=float,            # or None
+        dtype=str,            # or None
         autostrip=True,
         comments=None,
         invalid_raise=False,    # don't error on inconsistent rows
-        usecols=range(7),       # force 7 columns
+        usecols=range(8),       # force 7 columns
         filling_values=np.nan
-    )[1:,1:6]
-    return data  
+    )[1:,1:8]
+
+    return data
+
+
+def separate_cat_and_num(data, data_annoted) :
+    """
+    Separate categorical and numerical variables from given dataset "data". 
+    We have manually created a dataset called data_annoted. This dataset contains all
+    the features as rows. It also contains 7 columns (variable (name of the feature), keep (whether we judge the feature is relevant
+    or not for predicting heart disease), categorical (1 is categorical 0 is numerical), True/false (whether its a true false categorical variable),
+    continuous (1 if continous, 0 if not),"dont know" (specify the different numbers the dontknow or prefer not to say categories that we will replace
+    by nan's), special format (whether theres anything special about this feature) and nb_categories which gives the nb of categories in the feature)
+
+    We use those 2 dataset to split our data between numerical and categorical variable. 
+    We will use the categorical dataset to one hot encode it. 
+
+    Args : 
+        data : the dataset we want to split into numerical and categorical 
+        data_annoted : the dataset we created in order to sort the features
+    
+    Returns : 
+        data_categorical : the original dataset that has been amputed from its numerical values -> the indices have changed
+        data_numerical : the original dataset that has been amputed from its numerical values -> the indices have changed 
+        data_annoted_categorical : the annoted dataset where we removed the numerical values -> need it for no index confusion
+    """
+    data_annoted = data_annoted[data_annoted[:,0] != '0'] #remove useless
+    
+    idx_categorical = np.where(data_annoted[:,1] != '0') #gets all categorical indexes
+    idx_numerical = np.where(data_annoted[:,1]=='0') #gets all numerical indexes
+   
+    data_categorical = data[:,idx_categorical[0]] #splits data into only categorical data for later use
+    data_numerical = data[:,idx_numerical[0]] #splits data into only numerical data for later use
+    
+    data_annoted_categorical = data_annoted[idx_categorical,:] #splits the annoted data into only categorical
+    data_annoted_categorical = np.squeeze(data_annoted_categorical) #squeeze it bc it created 3d array
+
+    for index in range(len(data_annoted_categorical)): 
+        special_vals = data_annoted_categorical[index,4] #get the special values (dont know & prefered not to say and sometimes something else) for each feature : stored in 5th column of our artifically created dataset
+        special_val = special_vals.split('&') #split the special values 
+        for val in special_val : #iterate through the special values 
+            mask = data_categorical[:,index] == val #gets the indices where the feature = special value
+            data_categorical[mask,index] = np.nan #replace by NaN
+    
+    return data_categorical,data_numerical, data_annoted_categorical
+
+def one_hot_encode(data,data_annoted) : 
+    """
+    Function that one hot encodes (pas le temps de finir d'écrire)
+    """
+    one_hot_features = []
+    one_hot_features = []
+    for index in range(len(data_annoted)): 
+        n = float(data_annoted[index,6])
+        feature = data[:,index]
+  
+        unique_values = np.arange(n)
+        if np.isnan(feature).any():
+                categories = np.concatenate([unique_values, [np.nan]])
+        else:
+                categories = unique_values
+    
+        one_hot_matrix = np.zeros((data.shape[0], len(categories)))
+        
+        for i,value in enumerate(feature):
+                if np.isnan(value):
+                        cat_idx = np.where(np.isnan(categories))[0]
+                else:
+                        cat_idx = np.where(categories == value)[0]
+                one_hot_matrix[i, cat_idx] = 1
+        one_hot_features.append(one_hot_matrix)
+
+
+    onehot = np.hstack(one_hot_features)
+    return onehot
+
 
 def fill_empty_with_nan(data: np.ndarray) -> np.ndarray:
     """Fills empty values in the dataset with NaN.
