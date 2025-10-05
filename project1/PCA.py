@@ -13,9 +13,9 @@ def mp_dim_reduction(X):
     Xc = (X - mu) / sd
 
     # Correlation matrix and eigendecomposition
-    S = (Xc.T @ Xc) / T      # correlation (since standardized)
+    S = (Xc.T @ Xc) / T      # correlation
     evals, evecs = np.linalg.eigh(S)  # ascending
-    # MP edge (sigma^2=1 in correlation space)
+    # MP edge (sigma^2=1 in correlation)
     lam = d / T
     lam_plus = (1 + np.sqrt(lam))**2
 
@@ -30,13 +30,11 @@ def mp_dim_reduction(X):
     W_mp = evecs[:, idx_mp]                # columns = kept eigenvectors
     Z_mp = Xc @ W_mp                       # projected data
 
-    # EVR of correlation eigenvalues (sums to d because corr has unit variances)
+
     EVR = evals / np.sum(evals)
-    # For reporting, sort by descending eigenvalues (common convention)
     order_desc = np.argsort(evals)[::-1]
     evals_desc = evals[order_desc]
     EVR_desc = EVR[order_desc]
-    idx_mp_desc = np.flatnonzero(np.in1d(order_desc, idx_mp))
 
     return Z_mp, k_mp, idx_mp, evals, EVR, evals_desc, EVR_desc, order_desc
 
