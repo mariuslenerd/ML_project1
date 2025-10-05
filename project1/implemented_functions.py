@@ -48,11 +48,13 @@ def compute_loss(y,tx,w) :
     Returns : 
         the value of the square loss (a scalar) corresponding to input parameters w
     """
-
     N = y.shape[0]
     e = y - tx @ w
     MSE_loss = 1 / (2*N) * (e.T @ e)
     return MSE_loss
+
+def compute_rmse(y,tx,w) : 
+    return np.sqrt(2*compute_loss(y,tx,w))
 
 def compute_mse_gradient(y,tx,w) : 
     """
@@ -158,13 +160,13 @@ def sigmoid(z):
     return 1 / ( 1 + np.exp(-z))
 
 def compute_logistic_loss(y, tx, w):
-    prediction = sigmoid(tx.T @ w)
+    prediction = sigmoid(tx @ w)
     loss = -np.mean(y * np.log(prediction + 1e-15) + (1-y) * np.log(1 - prediction + 1e-15))
     return loss
 
 def compute_logistic_gradient(y, tx, w):
-    prediction = sigmoid(tx.T @ w)
-    return 1/N  * tx.T @ (prediction - y)
+    prediction = sigmoid(tx @ w)
+    return 1/tx.shape[0] * tx.T @ (prediction - y)
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma):
     w = initial_w

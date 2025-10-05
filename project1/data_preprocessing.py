@@ -1,5 +1,6 @@
 import numpy as np
 from helpers import *
+from itertools import combinations_with_replacement
 
 def remove_useless(data: np.ndarray, annotated_data: np.ndarray) -> np.ndarray:
     """Removes useless features from the dataset based on annotated data.
@@ -127,7 +128,7 @@ def fill_empty_with_nan(data: np.ndarray) -> np.ndarray:
     data_filled = np.where(data == '', np.nan, data)
     return data_filled
 
-def fill_specials(data, annotated_data):
+def fill_specials(x_train, annotated_data):
     """Fills special values in the dataset based on annotated data.
 
     Args:
@@ -160,4 +161,39 @@ def preprocess_data(x_train_raw: np.ndarray, x_test_raw: np.ndarray, annotated_d
     return x_train, x_test
 
 
+
+def build_poly(x, degree, interactions=False):
+    """
+    Polynomial features up to 'degree'.
+    - If x is (N,), returns (N, degree+1)  [bias + powers of the single feature]
+    - If x is (N, D) and interactions=False, returns (N, 1 + D*degree)
+      [bias + powers of each feature independently, no cross terms]
+    - If x is (N, D) and interactions=True, returns all monomials up to total
+      degree 'degree' (can be large): [1, x_i, x_i x_j, x_i^2, ...]
+    """
+    X = np.asarray(x)
+    if X.ndim == 1:
+        X = X.reshape(-1, 1)  # (N,1)
+
+    N, D = X.shape
+
+    if not interactions:
+        # [1, X, X^2, ..., X^degree] without cross terms
+        feats = [np.ones((N, 1))]
+        for d in range(1, degree + 1):
+            feats.append(X ** d)          
+        return np.hstack(feats)           # (N, 1 + D*degree)
+
+    # With interactions: all monomials up to total degree
+    feats = [np.ones((N, 1))]
+    # degree 1 terms are just the columns themselves
+    feats.append(X)  # (N, D)
+
+    # degrees >= 2: products of columns (with replacement)
+    # e.g., deg=3, comb [0,0,1] -> X[:,0]^2 * X[:,1]
+    for deg in range(2, degree + 1):
+        for comb in combinations_with_replacement(range(D), deg):
+            col = np.prod(X[:, comb], axis=1, keepdims=True)
+            feats.append(col)
+    return np.hstack(feats)
 
