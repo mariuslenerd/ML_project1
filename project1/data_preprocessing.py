@@ -81,32 +81,50 @@ def clean_data(data, data_annoted) :
     data_annoted_numerical = data_annoted[idx_numerical,:]
     data_annoted_numerical = np.squeeze(data_annoted_numerical)
 
-    for index in range(len(data_annoted_categorical)): 
-        special_vals = data_annoted_categorical[index,4] #get the special values (dont know & prefered not to say and sometimes something else) for each feature : stored in 5th column of our artifically created dataset
-        special_val = special_vals.split('&') #split the special values 
-        for val in special_val : #iterate through the special values 
-            mask_cat = data_categorical[:,index] == val #gets the indices where the feature = special value
-            data_categorical[mask_cat,index] = np.nan #replace by NaN
+    data_numerical =  deal_with_specials(data_annoted_numerical, data_numerical)
+    data_categorical = deal_with_specials(data_annoted_categorical, data_categorical)
 
-    for index in range(len(data_annoted_numerical)): 
-        special_vals = data_annoted_numerical[index,4] #get the special values (dont know & prefered not to say and sometimes something else) for each feature : stored in 5th column of our artifically created dataset
-        special_val = special_vals.split('&') #split the special values 
-        for val in special_val : #iterate through the special values 
-            val = float(val)
-            mask_num = data_numerical[:,index] == val #gets the indices where the feature = special value
-            data_numerical[mask_num,index] = np.nan #replace by NaN
-    
     nan_mask = np.isnan(data_numerical).astype(float)   
     data_filled = np.nan_to_num(data_numerical, nan=0.0)
     data_numerical_encoded = np.concatenate([data_filled, nan_mask], axis=1)
+    numerical_normalized = normalize_data(data_numerical_encoded)
+    numerical_normalized = np.nan_to_num(numerical_normalized, nan=0.0)
     data_categorical = one_hot_encode(data_categorical, data_annoted_categorical)
 
 
-    data_clean = np.hstack([data_categorical, data_numerical_encoded])
+    data_clean = np.hstack([data_categorical, numerical_normalized])
     
     return data_clean
 
+def balance_data(y, x):
+    """
+    The goal of this function is to undersample the majority class (in our case no heart attack). We will choose random lines from the majority class to be removed
+    """
+    rng = np.random.default_rng(seed=42) #to have reproducible results
+    idx_majority = np.where(y==0)[0] #get the indices of the majority class
+    idx_minority = np.where(y==1)[0] #get the indices of the
+    # randomly takes rows from the majority class and removes them so that we have the same number of samples in both classes
+    idx_majority_sampled = rng.choice(idx_majority, size=len(idx_minority), replace=False)
+    # combine back the indices
+    idx_balanced = np.concatenate([idx_majority_sampled, idx_minority])
+    # reshuffle the indices 
+    rng.shuffle(idx_balanced)
+    return x[idx_balanced], y[idx_balanced]
 
+def deal_with_specials(data_annotated, data):
+    for index in range(len(data_annotated)): 
+        special_vals = data_annotated[index,4] #get the special values (dont know & prefered not to say and sometimes something else) for each feature : stored in 5th column of our artifically created dataset
+        special_val = special_vals.split('&') #split the special values 
+        for val in special_val : #iterate through the special values 
+            val = float(val)
+            mask = data[:,index] == val #gets the indices where the feature = special value
+            data[mask,index] = np.nan #replace by NaN
+    return data
+
+
+def normalize_data(data):
+    data = data / data.max(axis=0)
+    return data
 
 def one_hot_encode(data,data_annoted) : 
     """
@@ -183,7 +201,15 @@ def preprocess_data(x_train_raw: np.ndarray, x_test_raw: np.ndarray, annotated_d
 
     return x_train, x_test
 
-
+def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data):
+    x_train_filtered = remove_useless(x_train_raw, annotated_data)
+    x_test_filtered = remove_useless(x_test_raw, annotated_data)
+    data_train = clean_data(x_train_filtered, annotated_data)
+    data_test = clean_data(x_test_filtered, annotated_data)
+    #np.savetxt('data_train.csv', data_train, delimiter=',')
+    #np.savetxt('data_test.csv', data_test, delimiter=',')
+    x_train, y_train = balance_data(y_train, data_train)
+    return x_train, y_train, data_test
 
 def build_poly(x, degree, interactions=False):
     """

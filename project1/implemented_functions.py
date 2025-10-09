@@ -117,13 +117,13 @@ def mean_squared_error_sgd(y,tx,initial_w, max_iters, gamma) :
 
     w = initial_w
     loss = compute_loss(y,tx,w)
-
+    loss_array = []
     for mini_batch_y, mini_batch_tx in batch_iter(y,tx,batch_size,max_iters): 
         grad = compute_mse_gradient(mini_batch_y,mini_batch_tx,w)
         w = w-gamma*grad
         loss = compute_loss(y,tx,w)
-
-    return w,loss
+        loss_array.append(loss)
+    return w,loss_array
 
 def least_squares(y,tx) : 
     """
