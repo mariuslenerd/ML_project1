@@ -44,8 +44,10 @@ def read_annotated_csv(path, delimiter=',', skip_header=0 ):
     return data
 
 
-def separate_cat_and_num(data, data_annoted) :
+def clean_data(data, data_annoted) :
     """
+
+    NEED TO REWRITE IT : DOES EVERYTHING AT ONCE
     Separate categorical and numerical variables from given dataset "data". 
     We have manually created a dataset called data_annoted. This dataset contains all
     the features as rows. It also contains 7 columns (variable (name of the feature), keep (whether we judge the feature is relevant
@@ -66,9 +68,9 @@ def separate_cat_and_num(data, data_annoted) :
         data_annoted_categorical : the annoted dataset where we removed the numerical values -> need it for no index confusion
     """
     data_annoted = data_annoted[data_annoted[:,0] != '0'] #remove useless
-    
-    idx_categorical = np.where(data_annoted[:,1] != '0') #gets all categorical indexes
-    idx_numerical = np.where(data_annoted[:,1]=='0') #gets all numerical indexes
+    idx_categorical = np.where((data_annoted[:,1] != '0') | (data_annoted[:,2]!= '0'))#gets all categorical indexes
+
+    idx_numerical = np.where(data_annoted[:,3]!= '0') #gets all numerical indexes
    
     data_categorical = data[:,idx_categorical[0]] #splits data into only categorical data for later use
     data_numerical = data[:,idx_numerical[0]] #splits data into only numerical data for later use
@@ -76,43 +78,64 @@ def separate_cat_and_num(data, data_annoted) :
     data_annoted_categorical = data_annoted[idx_categorical,:] #splits the annoted data into only categorical
     data_annoted_categorical = np.squeeze(data_annoted_categorical) #squeeze it bc it created 3d array
 
+    data_annoted_numerical = data_annoted[idx_numerical,:]
+    data_annoted_numerical = np.squeeze(data_annoted_numerical)
+
     for index in range(len(data_annoted_categorical)): 
         special_vals = data_annoted_categorical[index,4] #get the special values (dont know & prefered not to say and sometimes something else) for each feature : stored in 5th column of our artifically created dataset
         special_val = special_vals.split('&') #split the special values 
         for val in special_val : #iterate through the special values 
-            mask = data_categorical[:,index] == val #gets the indices where the feature = special value
-            data_categorical[mask,index] = np.nan #replace by NaN
+            mask_cat = data_categorical[:,index] == val #gets the indices where the feature = special value
+            data_categorical[mask_cat,index] = np.nan #replace by NaN
+
+    for index in range(len(data_annoted_numerical)): 
+        special_vals = data_annoted_numerical[index,4] #get the special values (dont know & prefered not to say and sometimes something else) for each feature : stored in 5th column of our artifically created dataset
+        special_val = special_vals.split('&') #split the special values 
+        for val in special_val : #iterate through the special values 
+            val = float(val)
+            mask_num = data_numerical[:,index] == val #gets the indices where the feature = special value
+            data_numerical[mask_num,index] = np.nan #replace by NaN
     
-    return data_categorical,data_numerical, data_annoted_categorical
+    nan_mask = np.isnan(data_numerical).astype(float)   
+    data_filled = np.nan_to_num(data_numerical, nan=0.0)
+    data_numerical_encoded = np.concatenate([data_filled, nan_mask], axis=1)
+    data_categorical = one_hot_encode(data_categorical, data_annoted_categorical)
+
+
+    data_clean = np.hstack([data_categorical, data_numerical_encoded])
+    
+    return data_clean
+
+
 
 def one_hot_encode(data,data_annoted) : 
     """
     Function that one hot encodes (pas le temps de finir d'écrire)
     """
     one_hot_features = []
-    one_hot_features = []
-    for index in range(len(data_annoted)): 
-        n = float(data_annoted[index,6])
-        feature = data[:,index]
+    for index in range(len(data_annoted)): #len(data_annoted) = nb of features
+        n = float(data_annoted[index,6]) #n = nb of categories of each feature
+        feature = data[:,index] #all lines = all 328'000 samples, column index = select the feature we want to one hot encode
   
-        unique_values = np.arange(n)
-        if np.isnan(feature).any():
-                categories = np.concatenate([unique_values, [np.nan]])
+        unique_values = np.arange(1,n+1) #creates an array with all the possible values for this feature from 0 to n-1
+        if np.isnan(feature).any():#if there is any nan value in the feature, we add one more category for the nan
+                categories = np.concatenate([unique_values, [np.nan]]) # add a categ : if for example we had [0,1,2] now we have [0,1,2,nan]
         else:
-                categories = unique_values
+                categories = unique_values 
     
-        one_hot_matrix = np.zeros((data.shape[0], len(categories)))
+        one_hot_matrix = np.zeros((data.shape[0], len(categories))) #create a matrix filled with 0 with shape (nb of samples, nb of cagtegories of the feature)
         
-        for i,value in enumerate(feature):
-                if np.isnan(value):
-                        cat_idx = np.where(np.isnan(categories))[0]
+        for i,value in enumerate(feature): #i = index of each category, value = value of the category
+                if np.isnan(value): #if value is nan : 
+                        cat_idx = np.where(np.isnan(categories))[0] #get the index 
                 else:
-                        cat_idx = np.where(categories == value)[0]
+                        cat_idx = np.where(categories == value)[0] 
                 one_hot_matrix[i, cat_idx] = 1
         one_hot_features.append(one_hot_matrix)
-
-
+       
+    
     onehot = np.hstack(one_hot_features)
+    
     return onehot
 
 
