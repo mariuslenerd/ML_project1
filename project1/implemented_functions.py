@@ -202,3 +202,75 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
     return w, loss
 
 
+# ---------------- LASSSO ----------------
+
+def sigmoid(z):
+    # stable sigmoid
+    z = np.clip(z, -40, 40)
+    return 1.0 / (1.0 + np.exp(-z))
+
+def soft_threshold(v, thr):
+    # elementwise soft-thresholding
+    return np.sign(v) * np.maximum(np.abs(v) - thr, 0.0)
+
+# ===== L1 (lasso) loss =====
+def compute_reg_logistic_loss_l1(y, tx, w, lambda_):
+    """
+    Logistic loss + L1 penalty (no penalty on bias w[0]).
+    """
+    p = sigmoid(tx @ w)
+    # cross-entropy
+    ce = -np.mean(y * np.log(p + 1e-15) + (1 - y) * np.log(1 - p + 1e-15))
+    # L1 penalty (note: no 0.5 factor for L1)
+    l1 = lambda_ * np.sum(np.abs(w[1:]))
+    return ce + l1
+
+def compute_logistic_grad_no_reg(y, tx, w):
+    """
+    Gradient of logistic loss ONLY (no regularization).
+    """
+    N = y.shape[0]
+    p = sigmoid(tx @ w)
+    return (tx.T @ (p - y)) / N
+
+# ===== Proximal Gradient Descent (ISTA) for L1-regularized logistic regression =====
+def reg_logistic_lasso(y, tx, lambda_, initial_w, max_iters, gamma, tol=1e-8):
+    """
+    Proximal gradient (soft-thresholding) solver for L1-regularized logistic regression.
+    - No penalty on bias w[0].
+    - gamma is the step size (can use backtracking; here it's fixed).
+    """
+    w = initial_w.astype(float).copy()
+    for _ in range(max_iters):
+        grad = compute_logistic_grad_no_reg(y, tx, w)
+        w_old = w.copy()
+        # gradient step
+        w = w - gamma * grad
+        # proximal (soft-threshold) on non-bias weights only
+        w[1:] = soft_threshold(w[1:], gamma * lambda_)
+        # stopping rule
+        if np.linalg.norm(w - w_old, ord=np.inf) <= tol * max(1.0, np.linalg.norm(w_old, ord=np.inf)):
+            break
+    loss = compute_reg_logistic_loss_l1(y, tx, w, lambda_)
+    return w, loss
+
+# ===== OPTIONAL: Subgradient version (simpler but slower) =====
+def compute_reg_logistic_subgradient(y, tx, w, lambda_):
+    """
+    Subgradient of logistic loss + L1.
+    Uses 0 as subgradient at exactly 0 (valid choice).
+    """
+    grad = compute_logistic_grad_no_reg(y, tx, w)
+    sg = np.sign(w)
+    sg[np.abs(w) < 1e-12] = 0.0
+    sg[0] = 0.0  # do not regularize bias
+    grad += lambda_ * sg
+    return grad
+
+def reg_logistic_lasso_subgradient(y, tx, lambda_, initial_w, max_iters, gamma):
+    w = initial_w.astype(float).copy()
+    for _ in range(max_iters):
+        grad = compute_reg_logistic_subgradient(y, tx, w, lambda_)
+        w = w - gamma * grad
+    loss = compute_reg_logistic_loss_l1(y, tx, w, lambda_)
+    return w, loss

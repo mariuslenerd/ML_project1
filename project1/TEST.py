@@ -1,6 +1,6 @@
 import numpy as np
 from cross_validation import cross_validation_demo_all
-from data_preprocessing import build_poly
+import data_preprocessing
 from PCA import *
 from plots import plot_method_grid
 
@@ -20,7 +20,7 @@ def test(x, y):
     max_iters = 1000
 
 
-    X_max = build_poly(x, max(degrees))
+    X_max = data_preprocessing.build_poly(x, max(degrees))
     initial_w = np.zeros(X_max.shape[1])
 
     best_by_method, curves = cross_validation_demo_all(

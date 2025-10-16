@@ -84,6 +84,8 @@ def cross_validation_demo(y, x, degree, k_fold, lambdas, initial_w, max_iters, g
         sums_te = {m: 0.0 for m in methods}
 
         for k in range(k_fold):
+            print(f"lambda={lambda_}, fold={k}")
+            print("'\n")
             res = cross_validation(y, x, k_indices, k, lambda_, degree, initial_w, max_iters, gamma)
             for m in methods:
                 tr_k, te_k = res[m]
