@@ -46,7 +46,7 @@ def read_annotated_csv(path, delimiter=',', skip_header=0 ):
 
 def clean_data(data, data_annoted) :
     """
-
+    Cleans and processes the dataset by separating,transforming and merging back categorical and numerical features. 
     NEED TO REWRITE IT : DOES EVERYTHING AT ONCE
     Separate categorical and numerical variables from given dataset "data". 
     We have manually created a dataset called data_annoted. This dataset contains all
@@ -67,31 +67,34 @@ def clean_data(data, data_annoted) :
         data_numerical : the original dataset that has been amputed from its numerical values -> the indices have changed 
         data_annoted_categorical : the annoted dataset where we removed the numerical values -> need it for no index confusion
     """
-    data_annoted = data_annoted[data_annoted[:,0] != '0'] #remove useless
-    idx_categorical = np.where((data_annoted[:,1] != '0') | (data_annoted[:,2]!= '0'))#gets all categorical indexes
+    #Remove useless features : 
+    data_annoted = data_annoted[data_annoted[:,0] != '0'] 
 
-    idx_numerical = np.where(data_annoted[:,3]!= '0') #gets all numerical indexes
+    #Identify categorical and numerical features : 
+    idx_categorical = (data_annoted[:,1] != '0') | (data_annoted[:,2]!= '0')
+    idx_numerical = data_annoted[:,3]!= '0'
    
-    data_categorical = data[:,idx_categorical[0]] #splits data into only categorical data for later use
-    data_numerical = data[:,idx_numerical[0]] #splits data into only numerical data for later use
-    
-    data_annoted_categorical = data_annoted[idx_categorical,:] #splits the annoted data into only categorical
-    data_annoted_categorical = np.squeeze(data_annoted_categorical) #squeeze it bc it created 3d array
-
+    #Split Data into separate categories (numerical and categorical)
+    data_categorical = data[:,idx_categorical] 
+    data_numerical = data[:,idx_numerical] 
+    data_annoted_categorical = data_annoted[idx_categorical,:] 
     data_annoted_numerical = data_annoted[idx_numerical,:]
-    data_annoted_numerical = np.squeeze(data_annoted_numerical)
 
+    #Handle special values 
     data_numerical =  deal_with_specials(data_annoted_numerical, data_numerical)
     data_categorical = deal_with_specials(data_annoted_categorical, data_categorical)
 
+    #Fill NaN(by -10) and normalize numerical features
     nan_mask = np.isnan(data_numerical).astype(float)   
-    data_filled = np.nan_to_num(data_numerical, nan=0.0)
+    data_filled = np.nan_to_num(data_numerical, nan=-10.0) #i replaced NaN by -10 instead of 0 
     data_numerical_encoded = np.concatenate([data_filled, nan_mask], axis=1)
     numerical_normalized = normalize_data(data_numerical_encoded)
     numerical_normalized = np.nan_to_num(numerical_normalized, nan=0.0)
+
+    #One-hot encode categorical features
     data_categorical = one_hot_encode(data_categorical, data_annoted_categorical)
 
-
+    #Merge categorical & numerical
     data_clean = np.hstack([data_categorical, numerical_normalized])
     
     return data_clean
@@ -100,14 +103,19 @@ def balance_data(y, x):
     """
     The goal of this function is to undersample the majority class (in our case no heart attack). We will choose random lines from the majority class to be removed
     """
-    rng = np.random.default_rng(seed=42) #to have reproducible results
-    idx_majority = np.where(y==0)[0] #get the indices of the majority class
-    idx_minority = np.where(y==1)[0] #get the indices of the
-    # randomly takes rows from the majority class and removes them so that we have the same number of samples in both classes
+    #Set Seed to have reproducible results when using random choices
+    rng = np.random.default_rng(seed=42) 
+    #Get the indxes of the majority & minority classes
+    idx_majority = np.where(y==0)[0] 
+    idx_minority = np.where(y==1)[0] 
+
+    #Randomly takes rows from the majority class and removes them so that we have the same number of samples in both classes
     idx_majority_sampled = rng.choice(idx_majority, size=len(idx_minority), replace=False)
-    # combine back the indices
+
+    #Combine back the indices
     idx_balanced = np.concatenate([idx_majority_sampled, idx_minority])
-    # reshuffle the indices 
+
+    #Reshuffle the indices 
     rng.shuffle(idx_balanced)
     return x[idx_balanced], y[idx_balanced]
 
@@ -131,24 +139,36 @@ def one_hot_encode(data,data_annoted) :
     Function that one hot encodes (pas le temps de finir d'écrire)
     """
     one_hot_features = []
-    for index in range(len(data_annoted)): #len(data_annoted) = nb of features
-        n = float(data_annoted[index,6]) #n = nb of categories of each feature
-        feature = data[:,index] #all lines = all 328'000 samples, column index = select the feature we want to one hot encode
-  
-        unique_values = np.arange(1,n+1) #creates an array with all the possible values for this feature from 0 to n-1
-        if np.isnan(feature).any():#if there is any nan value in the feature, we add one more category for the nan
-                categories = np.concatenate([unique_values, [np.nan]]) # add a categ : if for example we had [0,1,2] now we have [0,1,2,nan]
+    n_feat = len(data_annoted)
+    for index in range(n_feat): 
+
+        #Extract nb of categories of each feature which is stored in data_annoted
+        n = float(data_annoted[index,6]) 
+
+        #Select all samples from the feature we currently are one-hot encoding
+        feature = data[:,index] 
+        #Create an array with all possibles for this feature
+        unique_values = np.arange(1,n+1)
+
+        #Deal with NaN : also create a one-hot encoded column for NaN values
+        if np.isnan(feature).any():
+                #If there is NaN value : Add a category
+                categories = np.concatenate([unique_values, [np.nan]])
         else:
                 categories = unique_values 
-    
-        one_hot_matrix = np.zeros((data.shape[0], len(categories))) #create a matrix filled with 0 with shape (nb of samples, nb of cagtegories of the feature)
+       #Create a matrix of zeros with shape (nb of samples, nb of categories of the feature) 
+        one_hot_matrix = np.zeros((data.shape[0], len(categories)))
         
-        for i,value in enumerate(feature): #i = index of each category, value = value of the category
-                if np.isnan(value): #if value is nan : 
-                        cat_idx = np.where(np.isnan(categories))[0] #get the index 
+        #Go through each sample of the feature and fill the one_hot_matrix with the right row and column
+        for i,value in enumerate(feature): 
+                if np.isnan(value): 
+                        cat_idx = np.where(np.isnan(categories))[0] 
                 else:
                         cat_idx = np.where(categories == value)[0] 
                 one_hot_matrix[i, cat_idx] = 1
+        
+        #Remove the last column of each matrix (corresponding to category NaN) to avoid multicolinearity aka Dummy Variable trap
+        one_hot_matrix = one_hot_matrix[:,:-1] 
         one_hot_features.append(one_hot_matrix)
        
     
