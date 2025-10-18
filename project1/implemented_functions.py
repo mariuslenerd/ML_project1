@@ -274,3 +274,17 @@ def reg_logistic_lasso_subgradient(y, tx, lambda_, initial_w, max_iters, gamma):
         w = w - gamma * grad
     loss = compute_reg_logistic_loss_l1(y, tx, w, lambda_)
     return w, loss
+
+def compute_f1_score(y_true, y_pred):
+    """
+    Compute the F1 score given true and predicted binary labels.
+
+    Args:
+        y_true: numpy array of shape (N,), true binary labels (0 or 1)
+        y_pred: numpy array of shape (N,), predicted binary labels (0 or 1)
+    """
+    true_positives = np.sum((y_true == 1) & (y_pred == 1))
+    false_positives = np.sum((y_true == 0) & (y_pred == 1))
+    false_negatives = np.sum((y_true == 1) & (y_pred == 0))
+    f1 = 2*true_positives / (2*true_positives + false_positives + false_negatives)
+    return f1
