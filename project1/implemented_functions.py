@@ -144,8 +144,8 @@ def least_squares(y,tx) :
 
 def compute_ridge_loss(y, tx, w, lambda_):
     # with weighted loss 
-    w1 = 1/np.sum(y == 1)
-    w0 = 1/np.sum(y == 0)
+    w1 = tx.shape[0]/(2*np.sum(y == 1))
+    w0 = tx.shape[0]/(2*np.sum(y == 0))
     weights = np.where(y == 1, w1, w0)
     N = y.shape[0]
     e = y - tx @ w
@@ -159,8 +159,8 @@ def compute_ridge_loss(y, tx, w, lambda_):
 def ridge_regression(y, tx, lambda_):
     N, D = tx.shape
     # implement class weights test:
-    w1 = 1/np.sum(y == 1)
-    w0 = 1/np.sum(y == 0)
+    w1 = tx.shape[0]/(2*np.sum(y == 1))
+    w0 = tx.shape[0]/(2*np.sum(y == 0))
     weights = np.where(y == 1, w1, w0)
     # with weights 
     A = tx.T @ (weights[:, np.newaxis] * tx) + (N * lambda_) * np.eye(D)
@@ -184,6 +184,7 @@ def compute_logistic_loss(y, tx, w):
 
 def compute_logistic_gradient(y, tx, w):
     # TODO: la faut implementer la wieght dans le gradient, mais quand je l'ai fait j'ai perdu 15% d'accuracy donc je l'ai enlevé
+    
     prediction = sigmoid(tx @ w)
     return 1/tx.shape[0] * tx.T @ (prediction - y)
 
@@ -313,7 +314,7 @@ def compute_f1_score(y_true, y_pred):
     return f1
 
 def compute_accuracy(y_test, x_test, w, method, threshold=0.5):
-    if method in ["Logistic", "Regularized Logistic"]:
+    if method in ["Logistic", "Regularized Logistic", "Regularized Lasso"]:
         y_pred = sigmoid(x_test@w)
     else:
         y_pred = x_test@w
