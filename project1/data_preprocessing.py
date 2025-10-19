@@ -224,11 +224,12 @@ def preprocess_data(x_train_raw: np.ndarray, x_test_raw: np.ndarray, annotated_d
 def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data):
     x_train_filtered = remove_useless(x_train_raw, annotated_data)
     x_test_filtered = remove_useless(x_test_raw, annotated_data)
-    data_train = clean_data(x_train_filtered, annotated_data)
+    x_train = clean_data(x_train_filtered, annotated_data)
     x_test = clean_data(x_test_filtered, annotated_data)
     #np.savetxt('data_train.csv', data_train, delimiter=',')
     #np.savetxt('data_test.csv', data_test, delimiter=',')
-    x_train, y_train = balance_data(y_train, data_train)
+    # uncomment next line to balance the dataset
+    #x_train, y_train = balance_data(y_train, data_train)
     x_train = np.hstack((np.ones((x_train.shape[0],1)), x_train))
     x_test = np.hstack((np.ones((x_test.shape[0],1)), x_test))
     return x_train, y_train, x_test

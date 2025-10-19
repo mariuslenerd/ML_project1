@@ -143,15 +143,31 @@ def least_squares(y,tx) :
     return w,loss
 
 def compute_ridge_loss(y, tx, w, lambda_):
+    # with weighted loss 
+    w1 = 1/np.sum(y == 1)
+    w0 = 1/np.sum(y == 0)
+    weights = np.where(y == 1, w1, w0)
     N = y.shape[0]
     e = y - tx @ w
-    ridge_loss = 1 / (2*N) * (e.T @ e) + 0.5 * lambda_ * w.T @ w
+    ridge_loss = 0.5*np.mean((weights*(e**2))) + 0.5 * lambda_ * w.T @ w
+    # without weighted loss
+    #N = y.shape[0]
+    #e = y - tx @ w
+    #ridge_loss = 1 / (2*N) * (e.T @ e) + 0.5 * lambda_ * w.T @ w
     return ridge_loss
 
 def ridge_regression(y, tx, lambda_):
     N, D = tx.shape
-    A = tx.T @ tx + (N * lambda_) * np.eye(D)      
-    b = tx.T @ y                                   
+    # implement class weights test:
+    w1 = 1/np.sum(y == 1)
+    w0 = 1/np.sum(y == 0)
+    weights = np.where(y == 1, w1, w0)
+    # with weights 
+    A = tx.T @ (weights[:, np.newaxis] * tx) + (N * lambda_) * np.eye(D)
+    b = tx.T @ (weights * y)
+    # without weights
+    #A = tx.T @ tx + (N * lambda_) * np.eye(D)      
+    #b = tx.T @ y                                   
     w = np.linalg.solve(A, b)  
     loss = compute_ridge_loss(y, tx, w, lambda_)
     return w, loss
@@ -160,11 +176,14 @@ def sigmoid(z):
     return 1 / ( 1 + np.exp(-z))
 
 def compute_logistic_loss(y, tx, w):
+    w1 = 1/np.sum(y == 1) 
+    w0 = 1/np.sum(y == 0)
     prediction = sigmoid(tx @ w)
-    loss = -np.mean(y * np.log(prediction + 1e-15) + (1-y) * np.log(1 - prediction + 1e-15))
+    loss = -np.mean( w1 * y * np.log(prediction + 1e-15) + w0 * (1-y) * np.log(1 - prediction + 1e-15) )
     return loss
 
 def compute_logistic_gradient(y, tx, w):
+    # TODO: la faut implementer la wieght dans le gradient, mais quand je l'ai fait j'ai perdu 15% d'accuracy donc je l'ai enlevé
     prediction = sigmoid(tx @ w)
     return 1/tx.shape[0] * tx.T @ (prediction - y)
 
@@ -180,7 +199,9 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
 
 def compute_reg_logistic_loss(y, tx, w, lambda_):
     prediction = sigmoid(tx @ w)
-    cross_entropy_loss = -np.mean(y * np.log(prediction + 1e-15) + (1-y) * np.log(1 - prediction + 1e-15))
+    w1 = 1/np.sum(y == 1) 
+    w0 = 1/np.sum(y == 0)
+    cross_entropy_loss = -np.mean(w1 * y * np.log(prediction + 1e-15) + w0 * (1-y) * np.log(1 - prediction + 1e-15))
     # TODO: Check if we should also add the regularization term on the bias ? If so remove [1:]
     regularization = lambda_ * 0.5 * w.T[1:] @ w[1:]
     return cross_entropy_loss + regularization
@@ -219,8 +240,10 @@ def compute_reg_logistic_loss_l1(y, tx, w, lambda_):
     Logistic loss + L1 penalty (no penalty on bias w[0]).
     """
     p = sigmoid(tx @ w)
+    w1 = 1/np.sum(y == 1)
+    w0 = 1/np.sum(y == 0)
     # cross-entropy
-    ce = -np.mean(y * np.log(p + 1e-15) + (1 - y) * np.log(1 - p + 1e-15))
+    ce = -np.mean(w1 * y * np.log(p + 1e-15) + w0 * (1 - y) * np.log(1 - p + 1e-15))
     # L1 penalty (note: no 0.5 factor for L1)
     l1 = lambda_ * np.sum(np.abs(w[1:]))
     return ce + l1
@@ -288,3 +311,14 @@ def compute_f1_score(y_true, y_pred):
     false_negatives = np.sum((y_true == 1) & (y_pred == 0))
     f1 = 2*true_positives / (2*true_positives + false_positives + false_negatives)
     return f1
+
+def compute_accuracy(y_test, x_test, w, method, threshold=0.5):
+    if method in ["Logistic", "Regularized Logistic"]:
+        y_pred = sigmoid(x_test@w)
+    else:
+        y_pred = x_test@w
+    y_pred[y_pred <= threshold] = 0
+    y_pred[y_pred > 1-threshold] = 1
+    computed_accuracy = np.sum(y_pred == y_test)/len(y_test)
+    print(f"Accuracy of {method} is {computed_accuracy*100}%")
+    return computed_accuracy, y_pred
