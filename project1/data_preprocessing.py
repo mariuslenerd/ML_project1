@@ -12,16 +12,24 @@ def remove_useless(data: np.ndarray, annotated_data: np.ndarray) -> np.ndarray:
     Returns:
         np.ndarray: The data array with useless features removed.
     """
+
     mask = annotated_data[:, 0] != '0'               
     if mask.shape[0] != data.shape[1]:
         raise ValueError(f"Annotation length {mask.shape[0]} != n_features {data.shape[1]}")
     return data[:, mask] 
-def remove_nans(data):
+
+
+def remove_nans(data, columns_to_keep_indices = None ,test = False):
     "this function removes the features that have more than 30% of Nan values"
+    if test is True : 
+        data = data[:,columns_to_keep_indices]
+        return data,columns_to_keep_indices
+    
     nans = np.isnan(data)
     nans_pct = np.sum(nans, axis=0) / data.shape[0]
-    columns_to_remove_indices = np.where(nans_pct > 0.3)[0]
-    return data[:, nans_pct <= 0.3], columns_to_remove_indices 
+    columns_to_keep_indices = np.where(nans_pct <= 0.3)[0]
+
+    return data[:, nans_pct <= 0.3], columns_to_keep_indices 
 
 def read_annotated_csv(path, delimiter=',', skip_header=0 ):
     """Reads a CSV file and returns the data as a NumPy array.
@@ -58,7 +66,9 @@ def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data):
 
     Returns : x_train,y_train,x_test : the datasets contained in numpy arrays  
     """
-
+    x_train_filtered, nan_mask = remove_nans(x_train_raw)
+    x_test_filtered,nan_mask = remove_nans(x_test_raw,columns_to_keep_indices=nan_mask, test = True)
+    annotated_data = annotated_data[nan_mask,:]
     x_train_filtered = remove_useless(x_train_raw, annotated_data)
     x_test_filtered = remove_useless(x_test_raw, annotated_data)
     x_train, categories_list = clean_data(x_train_filtered, annotated_data)
@@ -95,7 +105,7 @@ def clean_data(data, data_annoted, test = False, categories_list = None) :
         data_clean (np.ndarray) : Fully processed dataset with encoded categorical variables and normalized numerical features
     """
     #Remove useless features : 
-    data_annoted = data_annoted[data_annoted[:,0] != '0'] 
+    #data_annoted = data_annoted[data_annoted[:,0] != '0'] 
 
     #Identify categorical and numerical features : 
     idx_categorical = (data_annoted[:,1] != '0') | (data_annoted[:,2]!= '0')
