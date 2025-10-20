@@ -43,29 +43,49 @@ def read_annotated_csv(path, delimiter=',', skip_header=0 ):
 
     return data
 
-
-def clean_data(data, data_annoted) :
+def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data):
     """
+    Calls the relevant functions : 
+            - removes the useless features based on the annotated csv files
+            - cleans the dataset and encodes it
+    Args : the raw datasets x_train_raw, y_train,x_test_raw and annotated data (csv file containing the informations about the features)
+
+    Returns : x_train,y_train,x_test : the datasets contained in numpy arrays  
+    """
+    x_train_filtered = remove_useless(x_train_raw, annotated_data)
+    x_test_filtered = remove_useless(x_test_raw, annotated_data)
+    x_train, categories_list = clean_data(x_train_filtered, annotated_data)
+    x_test,categories_list = clean_data(x_test_filtered, annotated_data,test = True,categories_list = categories_list)
+
+    #np.savetxt('data_train.csv', data_train, delimiter=',')
+    #np.savetxt('data_test.csv', data_test, delimiter=',')
+    # uncomment next line to balance the dataset
+    #x_train, y_train = balance_data(y_train, data_train)
+
+    x_train = np.hstack((np.ones((x_train.shape[0],1)), x_train))
+    x_test = np.hstack((np.ones((x_test.shape[0],1)), x_test))
+    return x_train, y_train, x_test
+
+
+def clean_data(data, data_annoted, test = False, categories_list = None) :
+    """
+
     Cleans and processes the dataset by separating,transforming and merging back categorical and numerical features. 
-    NEED TO REWRITE IT : DOES EVERYTHING AT ONCE
-    Separate categorical and numerical variables from given dataset "data". 
-    We have manually created a dataset called data_annoted. This dataset contains all
-    the features as rows. It also contains 7 columns (variable (name of the feature), keep (whether we judge the feature is relevant
-    or not for predicting heart disease), categorical (1 is categorical 0 is numerical), True/false (whether its a true false categorical variable),
-    continuous (1 if continous, 0 if not),"dont know" (specify the different numbers the dontknow or prefer not to say categories that we will replace
-    by nan's), special format (whether theres anything special about this feature) and nb_categories which gives the nb of categories in the feature)
-
-    We use those 2 dataset to split our data between numerical and categorical variable. 
-    We will use the categorical dataset to one hot encode it. 
-
-    Args : 
-        data : the dataset we want to split into numerical and categorical 
-        data_annoted : the dataset we created in order to sort the features
     
+    This function uses an annotated dataset ('data_annoted') which contains relevant informations concerning the features
+    such as relevance (coded by binary yes/no), type (categorical,numerical), special formats, nb of categories for categorical features.
+
+    This was done in order to : 
+        - Remove a big chunk of irrelevant features
+        - Handle special values (for example 'I dont know' or 'Prefer not to say' are sometimes coded as 9 and 7 but in fact they genuiely represent a NaN for our model)
+        - Separate numerical and categorical features for One-Hot encoding
+        - Normalize numerical values 
+        - Merge back the categorical and numerical datasets once they've been cleaned 
+    Args: 
+        data (np.ndarray) : Original dataset containing all the features
+        data_annoted (np.ndarray) : Annotated dataset containing all the relevant informations about the features
     Returns : 
-        data_categorical : the original dataset that has been amputed from its numerical values -> the indices have changed
-        data_numerical : the original dataset that has been amputed from its numerical values -> the indices have changed 
-        data_annoted_categorical : the annoted dataset where we removed the numerical values -> need it for no index confusion
+        data_clean (np.ndarray) : Fully processed dataset with encoded categorical variables and normalized numerical features
     """
     #Remove useless features : 
     data_annoted = data_annoted[data_annoted[:,0] != '0'] 
@@ -92,12 +112,134 @@ def clean_data(data, data_annoted) :
     numerical_normalized = np.nan_to_num(numerical_normalized, nan=0.0)
 
     #One-hot encode categorical features
-    data_categorical = one_hot_encode(data_categorical, data_annoted_categorical)
+    if test is True : 
+        data_categorical, categories_list = one_hot_encode(data_categorical, data_annoted_categorical,categories_list)
+    else : 
+        data_categorical, categories_list = one_hot_encode(data_categorical, data_annoted_categorical)
 
     #Merge categorical & numerical
     data_clean = np.hstack([data_categorical, numerical_normalized])
     
-    return data_clean
+    return data_clean,categories_list
+
+def deal_with_specials(data_annoted, data):
+    """
+    Replaces special or invalid feature values (e.g., "don't know", "prefer not to say") with NaN.
+
+    This function uses the annotated dataset (`data_annoted`) to identify special numeric codes 
+    for each feature (stored in the 5th column). These codes are replaced by NaN in the corresponding 
+    columns of the main dataset.
+
+    Args:
+        data_annotated (np.ndarray): Annotated data for each feature, where the 5th column lists 
+                                  special values separated by '&'
+        data (np.ndarray): Original dataset containing feature values
+
+    Returns:
+        data (np.ndarray): Modified dataset with all special values replaced by NaN.
+    """
+
+    for index in range(len(data_annoted)): 
+        #Get the special values (dont know & prefer not to say) which are stored in the 5th column of 'data_annoted'
+        special_vals = data_annoted[index,4] 
+
+       #Split the special values when there are more than one 
+        special_val = special_vals.split('&') 
+
+        #Iterate through the special values
+        for val in special_val :
+            val = float(val)
+            
+            #Gets the indices where the feature = special value
+            mask = data[:,index] == val 
+
+            #Replace the special value by a NaN
+            data[mask,index] = np.nan 
+    return data
+
+
+def normalize_data(data):
+    """
+    Normalizes numerical features to 0-1 range using min-max scaling
+    Each feature (column) is scaled independently according to : 
+        x_norm = (x-min(x))/(max(x)- min(x))
+    
+    Args : 
+        - data (np.ndarray) : numerical dataset to be normalized
+    Returns : 
+        - data (np.ndarray) : numerical normalized dataset with values lying between 0 and 1
+    """
+    data = (data - data.min(axis=0)) / (data.max(axis=0) - data.min(axis=0))
+    return data
+
+
+def one_hot_encode(data,data_annoted, categories = None) : 
+    """
+    One-hot encodes categorical features using the annotated dataset ('data_annoted')
+
+    This function transforms each categorical feature into a one-hot encoded representation. 
+    The number of category for each feature is known thanks to the annotated dataset. 
+    Missing values (NaN) are treated as a separate category during encoding, but the corresponding
+    column is removed afterward to avoid multicollinearity (dummy variable trap). 
+
+    To ensure consistent encoding between training and test sets, the function can either : 
+        - Create categories by itself (default, when 'categories = None') or 
+        - Use predefined categories (the ones created for the training set)
+
+    Args : 
+        - data (np.ndarray) : Categorical data to be one-hot encoded
+        - data_annoted (np.ndarray) : Annotated data for each feature,
+          where the 7th column contains the nb of categories of each feature 
+        - categories (np.ndarray) : Predefined categories for each feature to avoid any mismatch in the dimensions 
+        of train and test sets. If None, categories are inferred from the data 
+    
+    Returns : 
+        - one_hot (np.ndarray) : One-hot encoded dataset
+        - categories_list list[np.ndarray] : list of np arrays containing the categories for each feature
+
+    """
+    categories_list = []
+    one_hot_features = []
+    n_feat = len(data_annoted)
+    for index in range(n_feat): 
+
+        #Extract nb of categories of each feature which is stored in data_annoted
+        n = float(data_annoted[index,6]) 
+
+        #Select all samples from the feature we currently are one-hot encoding
+        feature = data[:,index] 
+        #Create an array with all possibles for this feature
+        unique_values = np.arange(1,n+1)
+        if categories is None : 
+             #Deal with NaN : also create a one-hot encoded column for NaN values
+            if np.isnan(feature).any():
+                #If there is NaN value : Add a category
+                cat_values = np.concatenate([unique_values, [np.nan]])
+            else:
+                cat_values = unique_values 
+        else :
+            cat_values = categories[index]
+             
+        categories_list.append(cat_values)
+       #Create a matrix of zeros with shape (nb of samples, nb of categories of the feature) 
+        one_hot_matrix = np.zeros((data.shape[0], len(cat_values)))
+        
+        #Go through each sample of the feature and fill the one_hot_matrix with the right row and column
+        for i,value in enumerate(feature): 
+                if np.isnan(value): 
+                        cat_idx = np.where(np.isnan(cat_values))[0] 
+                else:
+                        cat_idx = np.where(cat_values == value)[0] 
+                one_hot_matrix[i, cat_idx] = 1
+        
+        #Remove the last column of each matrix (corresponding to category NaN) to avoid multicolinearity aka Dummy Variable trap
+        one_hot_matrix = one_hot_matrix[:,:-1] 
+        one_hot_features.append(one_hot_matrix)
+       
+    
+    onehot = np.hstack(one_hot_features)
+    
+    return onehot, categories_list
 
 def balance_data(y, x):
     """
@@ -119,62 +261,8 @@ def balance_data(y, x):
     rng.shuffle(idx_balanced)
     return x[idx_balanced], y[idx_balanced]
 
-def deal_with_specials(data_annotated, data):
-    for index in range(len(data_annotated)): 
-        special_vals = data_annotated[index,4] #get the special values (dont know & prefered not to say and sometimes something else) for each feature : stored in 5th column of our artifically created dataset
-        special_val = special_vals.split('&') #split the special values 
-        for val in special_val : #iterate through the special values 
-            val = float(val)
-            mask = data[:,index] == val #gets the indices where the feature = special value
-            data[mask,index] = np.nan #replace by NaN
-    return data
 
 
-def normalize_data(data):
-    data = (data - data.min(axis=0)) / (data.max(axis=0) - data.min(axis=0))
-    return data
-
-def one_hot_encode(data,data_annoted) : 
-    """
-    Function that one hot encodes (pas le temps de finir d'écrire)
-    """
-    one_hot_features = []
-    n_feat = len(data_annoted)
-    for index in range(n_feat): 
-
-        #Extract nb of categories of each feature which is stored in data_annoted
-        n = float(data_annoted[index,6]) 
-
-        #Select all samples from the feature we currently are one-hot encoding
-        feature = data[:,index] 
-        #Create an array with all possibles for this feature
-        unique_values = np.arange(1,n+1)
-
-        #Deal with NaN : also create a one-hot encoded column for NaN values
-        if np.isnan(feature).any():
-                #If there is NaN value : Add a category
-                categories = np.concatenate([unique_values, [np.nan]])
-        else:
-                categories = unique_values 
-       #Create a matrix of zeros with shape (nb of samples, nb of categories of the feature) 
-        one_hot_matrix = np.zeros((data.shape[0], len(categories)))
-        
-        #Go through each sample of the feature and fill the one_hot_matrix with the right row and column
-        for i,value in enumerate(feature): 
-                if np.isnan(value): 
-                        cat_idx = np.where(np.isnan(categories))[0] 
-                else:
-                        cat_idx = np.where(categories == value)[0] 
-                one_hot_matrix[i, cat_idx] = 1
-        
-        #Remove the last column of each matrix (corresponding to category NaN) to avoid multicolinearity aka Dummy Variable trap
-        one_hot_matrix = one_hot_matrix[:,:-1] 
-        one_hot_features.append(one_hot_matrix)
-       
-    
-    onehot = np.hstack(one_hot_features)
-    
-    return onehot
 
 
 def fill_empty_with_nan(data: np.ndarray) -> np.ndarray:
@@ -221,18 +309,7 @@ def preprocess_data(x_train_raw: np.ndarray, x_test_raw: np.ndarray, annotated_d
 
     return x_train, x_test
 
-def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data):
-    x_train_filtered = remove_useless(x_train_raw, annotated_data)
-    x_test_filtered = remove_useless(x_test_raw, annotated_data)
-    x_train = clean_data(x_train_filtered, annotated_data)
-    x_test = clean_data(x_test_filtered, annotated_data)
-    #np.savetxt('data_train.csv', data_train, delimiter=',')
-    #np.savetxt('data_test.csv', data_test, delimiter=',')
-    # uncomment next line to balance the dataset
-    #x_train, y_train = balance_data(y_train, data_train)
-    x_train = np.hstack((np.ones((x_train.shape[0],1)), x_train))
-    x_test = np.hstack((np.ones((x_test.shape[0],1)), x_test))
-    return x_train, y_train, x_test
+
 
 def build_poly(x, degree, interactions=False):
     """
