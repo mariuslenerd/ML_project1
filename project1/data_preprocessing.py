@@ -20,7 +20,8 @@ def remove_nans(data):
     "this function removes the features that have more than 30% of Nan values"
     nans = np.isnan(data)
     nans_pct = np.sum(nans, axis=0) / data.shape[0]
-    return data[:, nans_pct <= 0.3]
+    columns_to_remove_indices = np.where(nans_pct > 0.3)[0]
+    return data[:, nans_pct <= 0.3], columns_to_remove_indices 
 
 def read_annotated_csv(path, delimiter=',', skip_header=0 ):
     """Reads a CSV file and returns the data as a NumPy array.
@@ -57,7 +58,7 @@ def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data):
 
     Returns : x_train,y_train,x_test : the datasets contained in numpy arrays  
     """
-    
+
     x_train_filtered = remove_useless(x_train_raw, annotated_data)
     x_test_filtered = remove_useless(x_test_raw, annotated_data)
     x_train, categories_list = clean_data(x_train_filtered, annotated_data)
