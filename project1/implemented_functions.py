@@ -176,8 +176,8 @@ def sigmoid(z):
     return 1 / ( 1 + np.exp(-z))
 
 def compute_logistic_loss(y, tx, w):
-    w1 = 1/np.sum(y == 1) 
-    w0 = 1/np.sum(y == 0)
+    w1 = tx.shape[0]/(2*np.sum(y == 1))
+    w0 = tx.shape[0]/(2*np.sum(y == 0))
     prediction = sigmoid(tx @ w)
     loss = -np.mean( w1 * y * np.log(prediction + 1e-15) + w0 * (1-y) * np.log(1 - prediction + 1e-15) )
     return loss
@@ -313,13 +313,15 @@ def compute_f1_score(y_true, y_pred):
     f1 = 2*true_positives / (2*true_positives + false_positives + false_negatives)
     return f1
 
-def compute_accuracy(y_test, x_test, w, method, threshold=0.5):
+def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None):
     if method in ["Logistic", "Regularized Logistic", "Regularized Lasso"]:
         y_pred = sigmoid(x_test@w)
     else:
         y_pred = x_test@w
-    y_pred[y_pred <= threshold] = 0
-    y_pred[y_pred > 1-threshold] = 1
+        y_pred[y_pred <= threshold] = 0
+        y_pred[y_pred > threshold] = 1
+    if mode == 'submission':
+        return 0, y_pred
     computed_accuracy = np.sum(y_pred == y_test)/len(y_test)
     print(f"Accuracy of {method} is {computed_accuracy*100}%")
     return computed_accuracy, y_pred
