@@ -319,7 +319,7 @@ def compute_f1_score(y_true, y_pred):
     f1 = 2*true_positives / (2*true_positives + false_positives + false_negatives)
     return f1
 
-def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None):
+def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None, detailed=True):
     if method in ["Logistic", "Regularized Logistic", "Regularized Lasso"]:
         y_pred = sigmoid(x_test@w)
     else:
@@ -329,5 +329,6 @@ def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None):
     if mode == 'submission':
         return 0, y_pred
     computed_accuracy = np.sum(y_pred == y_test)/len(y_test)
-    print(f"Accuracy of {method} is {computed_accuracy*100}%")
+    if detailed:
+        print(f"Accuracy of {method} is {computed_accuracy*100}%")
     return computed_accuracy, y_pred
