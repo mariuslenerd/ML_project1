@@ -183,10 +183,13 @@ def compute_logistic_loss(y, tx, w):
     return loss
 
 def compute_logistic_gradient(y, tx, w):
-    # TODO: la faut implementer la wieght dans le gradient, mais quand je l'ai fait j'ai perdu 15% d'accuracy donc je l'ai enlevé
-    
+    N = len(y)
     prediction = sigmoid(tx @ w)
-    return 1/tx.shape[0] * tx.T @ (prediction - y)
+    w1 = N / (2 * np.sum(y == 1))
+    w0 = N / (2 * np.sum(y == 0))
+    weights = np.where(y == 1, w1, w0)
+    grad = (tx.T @ (weights * (prediction - y))) / N
+    return grad
 
 def logistic_regression(y, tx, initial_w, max_iters, gamma):
     w = initial_w
@@ -200,18 +203,21 @@ def logistic_regression(y, tx, initial_w, max_iters, gamma):
 
 def compute_reg_logistic_loss(y, tx, w, lambda_):
     prediction = sigmoid(tx @ w)
-    w1 = 1/np.sum(y == 1) 
-    w0 = 1/np.sum(y == 0)
+    w1 = len(y) / (2 * np.sum(y == 1))
+    w0 = len(y) / (2 * np.sum(y == 0))
     cross_entropy_loss = -np.mean(w1 * y * np.log(prediction + 1e-15) + w0 * (1-y) * np.log(1 - prediction + 1e-15))
     # TODO: Check if we should also add the regularization term on the bias ? If so remove [1:]
-    regularization = lambda_ * 0.5 * w.T[1:] @ w[1:]
+    regularization = 0.5 * lambda_ * np.sum(w[1:] ** 2)
     return cross_entropy_loss + regularization
 
 def compute_reg_logistic_gradient(y, tx, w, lambda_):
     N = y.shape[0]
     prediction = sigmoid(tx @ w)
+    w1 = N / (2 * np.sum(y == 1))
+    w0 = N / (2 * np.sum(y == 0))
+    weights = np.where(y == 1, w1, w0)
     # TODO: Check if we should also add the regularization term on the bias ?  if so remove [1:]
-    gradient = 1/N  * tx.T @ (prediction - y)
+    gradient = 1/N  * tx.T @ (weights *(prediction - y))
     gradient[1:] += lambda_ * w[1:]
     return gradient
 
@@ -224,7 +230,7 @@ def reg_logistic_regression(y, tx, lambda_, initial_w, max_iters, gamma):
     return w, loss
 
 
-# ---------------- LASSSO ----------------
+# ---------------- LASSO ----------------
 
 def sigmoid(z):
     # stable sigmoid
@@ -318,8 +324,8 @@ def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None):
         y_pred = sigmoid(x_test@w)
     else:
         y_pred = x_test@w
-        y_pred[y_pred <= threshold] = 0
-        y_pred[y_pred > threshold] = 1
+    y_pred[y_pred <= threshold] = 0
+    y_pred[y_pred > threshold] = 1
     if mode == 'submission':
         return 0, y_pred
     computed_accuracy = np.sum(y_pred == y_test)/len(y_test)
