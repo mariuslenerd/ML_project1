@@ -34,7 +34,7 @@ def batch_iter(y,tx,batch_size, num_batches = 1, shuffle = True) :
         end_index = (
             start_index + batch_size
         )  # The first data point of the following batch
-        yield y[start_index:end_index], tx[start_index:end_index]
+        yield y[start_index:end_index], tx[start_index:end_index], np.arange(start_index, end_index)
 
 def compute_loss(y,tx,w) : 
     """
@@ -56,7 +56,7 @@ def compute_loss(y,tx,w) :
 def compute_rmse(y,tx,w) : 
     return np.sqrt(2*compute_loss(y,tx,w))
 
-def compute_mse_gradient(y,tx,w) : 
+def compute_mse_gradient(y,tx,w, weights = None) : 
     """
     Computes the gradient at w using the mse loss 
     
@@ -68,11 +68,11 @@ def compute_mse_gradient(y,tx,w) :
     Returns : 
         Numpy array of shape (D,) containing the gradient of the loss at w
     """
+    if weights is None:
+        weights = make_class_weights(y)
     n = len(y)
-    
-    #error vector 
     e = y- tx@w
-    return -(tx.T@e)/n
+    return -(tx.T@(weights*e))/np.sum(weights)
 
 def mean_squared_error_gd(y,tx,initial_w, max_iters,gamma) : 
     """
@@ -90,12 +90,11 @@ def mean_squared_error_gd(y,tx,initial_w, max_iters,gamma) :
     """
 
     w = initial_w
-    loss = compute_loss(y,tx,w)
-
+    loss = compute_weighted_loss(y,tx,w,weights=make_class_weights(y))
     for n in range(max_iters) : 
         w = w - gamma*compute_mse_gradient(y,tx,w)
 
-        loss = compute_loss(y,tx,w)
+        loss = compute_weighted_loss(y,tx,w,weights=make_class_weights(y))
 
     return w,loss
 
@@ -113,17 +112,64 @@ def mean_squared_error_sgd(y,tx,initial_w, max_iters, gamma) :
     Returns : 
         A numpy array of shape (D,), the same as initial_w. containing the last vector of parameters and a float corresponding to the loss value of the model with those last parameters
     """
-    batch_size = 1
+    batch_size = 8
 
     w = initial_w
     loss = compute_loss(y,tx,w)
-    loss_array = []
-    for mini_batch_y, mini_batch_tx in batch_iter(y,tx,batch_size,max_iters): 
-        grad = compute_mse_gradient(mini_batch_y,mini_batch_tx,w)
+    weights = make_class_weights(y)
+    for mini_batch_y, mini_batch_tx, idx in batch_iter(y,tx,batch_size,max_iters): 
+        batch_weights = weights[idx]
+        grad = compute_mse_gradient(mini_batch_y,mini_batch_tx,w,weights=batch_weights)
         w = w-gamma*grad
-        loss = compute_loss(y,tx,w)
-        loss_array.append(loss)
-    return w,loss_array
+    loss = compute_weighted_loss(y,tx,w,weights)
+
+    return w, loss
+
+def make_class_weights(y):
+    """
+    y: shape (N,), binary {0,1}
+    returns sample_weights: shape (N,)
+    """
+    N = y.shape[0]
+    N1 = np.sum(y == 1)
+    N0 = np.sum(y == 0)
+
+    w1 = N / (2 * N1) if N1 > 0 else 0.0
+    w0 = N / (2 * N0) if N0 > 0 else 0.0
+
+    sample_weights = np.where(y == 1, w1, w0)
+    return sample_weights
+
+def compute_weighted_loss(y, x, w, weights):
+    """
+    attention! weights is not the weights of the model but the weights for class balancing
+    """
+    residuals = y - x @ w
+    weighted_sq_errors = weights * (residuals ** 2)
+    return 0.5*np.sum(weighted_sq_errors) / np.sum(weights)
+
+def class_weighted_least_squares(y, tx):
+    """
+    Solve least squares but force each class to matter equally.
+
+    Args:
+        y  : shape (N,), values in {0,1}
+        tx : shape (N,D)
+
+    Returns:
+        w     : shape (D,)
+        loss  : scalar (weighted MSE)
+    """
+    sample_weights = make_class_weights(y)       
+
+    sqrt_w = np.sqrt(sample_weights)[:, None]    
+    X_tilde = sqrt_w * tx                        
+    y_tilde = np.sqrt(sample_weights) * y        
+
+    w = np.linalg.lstsq(X_tilde, y_tilde, rcond=None)[0]
+
+    loss = compute_weighted_loss(y, tx, w, sample_weights)
+    return w, loss
 
 def least_squares(y,tx) : 
     """
