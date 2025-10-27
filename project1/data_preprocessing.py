@@ -25,7 +25,7 @@ def remove_nan(x_train, x_test):
     x_test = x_test[:, mask]
     return x_train, x_test, mask
 
-def read_annotated_csv(path, delimiter=',', skip_header=0 ):
+def read_annotated_csv(path, delimiter=',', skip_header=0, important_feat_only = False):
     """Reads a CSV file and returns the data as a NumPy array.
 
     Args:
@@ -36,22 +36,34 @@ def read_annotated_csv(path, delimiter=',', skip_header=0 ):
     Returns:
         np.ndarray: The data from the CSV file as a NumPy array.
     """
-
-    data = np.genfromtxt(
+    if important_feat_only is True : 
+        data =  np.genfromtxt(
         path,
         delimiter=",",
-        skip_header=skip_header,
+        skip_header=0,
         dtype=str,            # or None
         autostrip=True,
         comments=None,
         invalid_raise=False,    # don't error on inconsistent rows
-        usecols=range(8),       # force 7 columns
+        usecols=range(11),       # force 7 columns
         filling_values=np.nan
-    )[1:,1:8]
+    )[1:,1:11]
+    else : 
+        data = np.genfromtxt(
+            path,
+            delimiter=",",
+            skip_header=skip_header,
+            dtype=str,            # or None
+            autostrip=True,
+            comments=None,
+            invalid_raise=False,    # don't error on inconsistent rows
+            usecols=range(8),       # force 7 columns
+            filling_values=np.nan
+        )[1:,1:8]
 
     return data
 
-def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data):
+def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important_feat_only = False):
     """
     Calls the relevant functions : 
             - removes the useless features based on the annotated csv files
@@ -64,20 +76,24 @@ def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data):
     annotated_data = annotated_data[mask,:]
     x_train_filtered = remove_useless(x_train_no_nan, annotated_data)
     x_test_filtered = remove_useless(x_test_no_nan, annotated_data)
-    x_train, categories_list = clean_data(x_train_filtered, annotated_data)
-    x_test,categories_list = clean_data(x_test_filtered, annotated_data,test = True,categories_list = categories_list)
+    if important_feat_only is True : 
+        x_train, categories_list = clean_data(x_train_filtered, annotated_data,important_feat_only=True)
+        x_test,categories_list = clean_data(x_test_filtered, annotated_data,test = True,categories_list = categories_list,important_feat_only=True)
+    else : 
+        x_train, categories_list = clean_data(x_train_filtered, annotated_data)
+        x_test,categories_list = clean_data(x_test_filtered, annotated_data,test = True,categories_list = categories_list)
 
-    #np.savetxt('data_train.csv', data_train, delimiter=',')
-    #np.savetxt('data_test.csv', data_test, delimiter=',')
-    # uncomment next line to balance the dataset
-    #x_train, y_train = balance_data(y_train, data_train)
+        #np.savetxt('data_train.csv', data_train, delimiter=',')
+        #np.savetxt('data_test.csv', data_test, delimiter=',')
+        # uncomment next line to balance the dataset
+        #x_train, y_train = balance_data(y_train, data_train)
 
     x_train = np.hstack((np.ones((x_train.shape[0],1)), x_train))
     x_test = np.hstack((np.ones((x_test.shape[0],1)), x_test))
     return x_train, y_train, x_test
 
 
-def clean_data(data, data_annoted, test = False, categories_list = None) :
+def clean_data(data, data_annotated, test = False, categories_list = None, important_feat_only = False) :
     """
 
     Cleans and processes the dataset by separating,transforming and merging back categorical and numerical features. 
@@ -98,21 +114,26 @@ def clean_data(data, data_annoted, test = False, categories_list = None) :
         data_clean (np.ndarray) : Fully processed dataset with encoded categorical variables and normalized numerical features
     """
     #Remove useless features : 
-    data_annoted = data_annoted[data_annoted[:,0] != '0'] 
+    data_annotated = data_annotated[data_annotated[:,0] != '0'] 
 
-    #Identify categorical and numerical features : 
-    idx_categorical = (data_annoted[:,1] != '0') | (data_annoted[:,2]!= '0')
-    idx_numerical = data_annoted[:,3]!= '0'
-   
+    if important_feat_only is True : 
+        idx_categorical = np.where(((data_annotated[:,1] != '0') | (data_annotated[:,2]!= '0')) & (data_annotated[:,7] == '1'))[0]
+        idx_numerical = np.where((data_annotated[:,3]!= '0')& (data_annotated[:,7]== '1'))[0]     
+                            
+    else : 
+        #Identify categorical and numerical features : 
+        idx_categorical = np.where((data_annotated[:,1] != '0') | (data_annotated[:,2]!= '0'))[0]
+        idx_numerical = np.where(data_annotated[:,3]!= '0')[0]
+    
     #Split Data into separate categories (numerical and categorical)
     data_categorical = data[:,idx_categorical] 
     data_numerical = data[:,idx_numerical] 
-    data_annoted_categorical = data_annoted[idx_categorical,:] 
-    data_annoted_numerical = data_annoted[idx_numerical,:]
+    data_annotated_categorical = data_annotated[idx_categorical,:] 
+    data_annotated_numerical = data_annotated[idx_numerical,:]
 
     #Handle special values 
-    data_numerical =  deal_with_specials(data_annoted_numerical, data_numerical)
-    data_categorical = deal_with_specials(data_annoted_categorical, data_categorical)
+    data_numerical =  deal_with_specials(data_annotated_numerical, data_numerical)
+    data_categorical = deal_with_specials(data_annotated_categorical, data_categorical)
 
     #Fill NaN(by -10) and normalize numerical features
     nan_mask = np.isnan(data_numerical).astype(float)   
@@ -123,9 +144,9 @@ def clean_data(data, data_annoted, test = False, categories_list = None) :
 
     #One-hot encode categorical features
     if test is True : 
-        data_categorical, categories_list = one_hot_encode(data_categorical, data_annoted_categorical,categories_list)
+        data_categorical, categories_list = one_hot_encode(data_categorical, data_annotated_categorical,categories_list)
     else : 
-        data_categorical, categories_list = one_hot_encode(data_categorical, data_annoted_categorical)
+        data_categorical, categories_list = one_hot_encode(data_categorical, data_annotated_categorical)
 
     #Merge categorical & numerical
     data_clean = np.hstack([data_categorical, numerical_normalized])
