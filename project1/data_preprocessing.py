@@ -1,6 +1,7 @@
 import numpy as np
 from helpers import *
 from itertools import combinations_with_replacement
+from frequency_processing import *
 
 def remove_useless(data: np.ndarray, annotated_data: np.ndarray) -> np.ndarray:
     """Removes useless features from the dataset based on annotated data.
@@ -57,11 +58,13 @@ def read_annotated_csv(path, delimiter=',', skip_header=0, important_feat_only =
             autostrip=True,
             comments=None,
             invalid_raise=False,    # don't error on inconsistent rows
-            usecols=range(8),       # force 7 columns
+            usecols=range(12),       # force 7 columns
             filling_values=np.nan
-        )[1:,1:8]
+        )[1:,1:12]
 
     return data
+
+
 
 def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important_feat_only = False):
     """
@@ -74,6 +77,12 @@ def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important
     """
     x_train_no_nan, x_test_no_nan, mask = remove_nan(x_train_raw, x_test_raw)
     annotated_data = annotated_data[mask,:]
+
+    # dealing with the frequency issue
+    x_train_no_nan = deal_with_frequencies(x_train_no_nan, annotated_data)
+    x_test_no_nan = deal_with_frequencies(x_test_no_nan, annotated_data)
+
+
     x_train_filtered = remove_useless(x_train_no_nan, annotated_data)
     x_test_filtered = remove_useless(x_test_no_nan, annotated_data)
     if important_feat_only is True : 
