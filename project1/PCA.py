@@ -45,10 +45,16 @@ def PCA_threshold(X, threshold):
     smallest k s.t. cumulative EVR >= threshold.
     Returns projected data Z_pca and indices of top-k eigenvectors.
     """
+    X = np.asarray(X, dtype=float)
     T, d = X.shape
+
+    # Standardize (population mean, sample std with ddof=1 is common for correlation)
     mu = np.mean(X, axis=0)
-    sd = np.std(X, axis=0, ddof=0)
-    Xc = (X - mu) / sd
+    sd = np.std(X, axis=0, ddof=1)
+    zero_var = (sd == 0) | ~np.isfinite(sd)
+    idx_kept = np.where(~zero_var)[0]
+
+    Xc = (X[:, idx_kept] - mu[idx_kept]) / sd[idx_kept]
 
     # Correlation matrix via 1/T
     S = (Xc.T @ Xc) / T

@@ -1,7 +1,7 @@
 import numpy as np
 from implemented_functions import *
 from data_preprocessing import build_poly
-from plots import plot_all_methods
+import matplotlib.pyplot as plt
 
 def build_k_indices(y, k_fold, seed):
     """build k indices for k-fold.
@@ -26,7 +26,21 @@ def build_k_indices(y, k_fold, seed):
     return np.array(k_indices)
 
 
-def cross_validation(y, x, k_indices, k, lambda_, degree, initial_w, max_iters, gamma):
+###############################################################################
+# Helpers
+###############################################################################
+def init_w_for_degree(initial_w, n_features):
+    """Return an initial w of the right length for this polynomial degree."""
+    if len(initial_w) == n_features:
+        return initial_w
+    return np.zeros(n_features, dtype=float)
+
+def cross_validation_single(
+    y, x, k_indices, k, lambda_, degree,initial_w, max_iters, gamma, method
+):
+    """
+    Train ONE method on fold k and return (train_loss, test_loss) for that method.
+    """
 
     te_idx = k_indices[k]
     tr_idx = np.hstack([k_indices[i] for i in range(k_indices.shape[0]) if i != k])
@@ -36,155 +50,465 @@ def cross_validation(y, x, k_indices, k, lambda_, degree, initial_w, max_iters, 
     x_te_k = x[te_idx]
     y_te_k = y[te_idx]
 
-    x_tr_k_poly = build_poly(x_tr_k,degree)
-    x_te_k_poly = build_poly(x_te_k,degree)
+    x_tr_poly = build_poly(x_tr_k, degree, interactions=False)
+    x_te_poly = build_poly(x_te_k, degree,interactions=False)
+    # --- regression-style losses are RMSE, logistic-style are log-loss ---
+    if method == "mse_gd":
+        w, _ = mean_squared_error_gd(y_tr_k, x_tr_poly, initial_w, max_iters, gamma)
+        tr_loss = compute_rmse(y_tr_k, x_tr_poly, w)
+        te_loss = compute_rmse(y_te_k, x_te_poly, w)
 
-    # --- Train all models on the training fold ---
-    w_mse_gd, _loss_mse_gd   = mean_squared_error_gd(y_tr_k,  x_tr_k_poly, initial_w, max_iters, gamma)
-    w_mse_sgd, _loss_mse_sgd = mean_squared_error_sgd(y_tr_k, x_tr_k_poly, initial_w, max_iters, gamma)
-    w_rdg, _loss_rdg         = ridge_regression(y_tr_k,       x_tr_k_poly, lambda_)
-    w_ls, _loss_ls           = least_squares(y_tr_k,          x_tr_k_poly)
-    w_lr, _loss_lr           = logistic_regression(y_tr_k,    x_tr_k_poly, initial_w, max_iters, gamma)
-    w_reg_lr, _loss_reg_lr   = reg_logistic_regression(y_tr_k,x_tr_k_poly, lambda_, initial_w, max_iters, gamma)
+    elif method == "mse_sgd":
+        w, _ = mean_squared_error_sgd(y_tr_k, x_tr_poly, initial_w, max_iters, gamma)
+        tr_loss = compute_rmse(y_tr_k, x_tr_poly, w)
+        te_loss = compute_rmse(y_te_k, x_te_poly, w)
 
-    results = {}
+    elif method == "least_squares":
+        w, _ = least_squares(y_tr_k, x_tr_poly)
+        tr_loss = compute_rmse(y_tr_k, x_tr_poly, w)
+        te_loss = compute_rmse(y_te_k, x_te_poly, w)
 
-    # Regression models -> RMSE
-    results["mse_gd"]       = (compute_rmse(y_tr_k, x_tr_k_poly, w_mse_gd),   compute_rmse(y_te_k, x_te_k_poly, w_mse_gd))
-    results["mse_sgd"]      = (compute_rmse(y_tr_k, x_tr_k_poly, w_mse_sgd),  compute_rmse(y_te_k, x_te_k_poly, w_mse_sgd))
-    results["least_squares"]= (compute_rmse(y_tr_k, x_tr_k_poly, w_ls),       compute_rmse(y_te_k, x_te_k_poly, w_ls))
-    results["ridge"]        = (compute_rmse(y_tr_k, x_tr_k_poly, w_rdg),      compute_rmse(y_te_k, x_te_k_poly, w_rdg))
+    elif method == "ridge":
+        w, _ = ridge_regression(y_tr_k, x_tr_poly, lambda_)
+        tr_loss = compute_rmse(y_tr_k, x_tr_poly, w)
+        te_loss = compute_rmse(y_te_k, x_te_poly, w)
 
-    # Logistic models -> log-loss (y must be 0/1 for these)
-    results["logistic"]     = (compute_logistic_loss(y_tr_k, x_tr_k_poly, w_lr),    compute_logistic_loss(y_te_k, x_te_k_poly, w_lr))
-    results["reg_logistic"] = (compute_reg_logistic_loss(y_tr_k, x_tr_k_poly, w_reg_lr, lambda_), compute_reg_logistic_loss(y_te_k, x_te_k_poly, w_reg_lr, lambda_))
+    elif method == "logistic":
+        w, _ = logistic_regression(y_tr_k, x_tr_poly, initial_w, max_iters, gamma)
+        tr_loss = compute_logistic_loss(y_tr_k, x_tr_poly, w)
+        te_loss = compute_logistic_loss(y_te_k, x_te_poly, w)
 
-    return results
+    elif method == "reg_logistic":
+        w, _ = reg_logistic_regression(
+            y_tr_k, x_tr_poly, lambda_, initial_w, max_iters, gamma
+        )
+        tr_loss = compute_reg_logistic_loss(y_tr_k, x_tr_poly, w, lambda_)
+        te_loss = compute_reg_logistic_loss(y_te_k, x_te_poly, w, lambda_)
+
+    elif method == "reg_lasso_logistic":
+        # subgradient L1 solver
+        w, _ = reg_logistic_lasso_subgradient(
+            y_tr_k, x_tr_poly, lambda_, initial_w, max_iters, gamma
+        )
+        tr_loss = compute_reg_logistic_loss_l1(y_tr_k, x_tr_poly, w, lambda_)
+        te_loss = compute_reg_logistic_loss_l1(y_te_k, x_te_poly, w, lambda_)
+
+    else:
+        raise ValueError(f"Unknown method {method}")
+
+    return tr_loss, te_loss
 
 
+###############################################################################
+# MAIN CV DRIVER
+###############################################################################
 
-### CROSS VALIDATION DEMO (ALL MODELS) FOR ONE DEGREE AND ONE LEARNING RATE GAMMA ###
-def cross_validation_demo(y, x, degree, k_fold, lambdas, initial_w, max_iters, gamma, seed=12):
+def cross_validation_demo_all(
+    y,
+    x,
+    degrees,
+    k_fold,
+    lambdas,
+    initial_w,
+    max_iters,
+    gammas,
+    seed=12,
+    verbose=True,
+):
     """
-    Cross-validate *all* models you trained inside cross_validation()
-    across the provided 'lambdas'. For models that don't depend on lambda,
-    the curve will be (nearly) flat across lambdas.
-    Returns:
-        best_by_method: dict method -> (best_lambda, best_test_loss)
+    Run K-fold CV for all methods, but:
+    - Only sweep gamma for methods that depend on gamma.
+    - Only sweep lambda for methods that depend on lambda.
+    - Sweep both for methods that depend on both.
+    - No sweep if method has neither.
+
+    Also prints live progress and returns:
+        best_by_method[method] = {
+            "degree", "lambda", "gamma", "test_loss"
+        }
+
+    curves[method][degree] has this shape depending on hyperparams:
+        if method needs neither:
+            {
+              "train": float,
+              "test": float
+            }
+        if only lambda:
+            {
+              "lambdas": np.array([...]),
+              "train":  np.array([...]),
+              "test":   np.array([...])
+            }
+        if only gamma:
+            {
+              "gammas": np.array([...]),
+              "train":  np.array([...]),
+              "test":   np.array([...])
+            }
+        if both:
+            {
+              "lambdas": np.array([...]),
+              "gammas":  np.array([...]),
+              "train":   np.array[[len(gammas), len(lambdas)]],
+              "test":    np.array[[len(gammas), len(lambdas)]],
+            }
     """
 
+    # define which hyperparams each method actually uses
+    method_specs = {
+        "mse_gd":               {"need_lambda": False, "need_gamma": True},
+        "mse_sgd":              {"need_lambda": False, "need_gamma": True},
+        "least_squares":        {"need_lambda": False, "need_gamma": False},
+        "ridge":                {"need_lambda": True,  "need_gamma": False},
+        "logistic":             {"need_lambda": False, "need_gamma": True},
+        "reg_logistic":         {"need_lambda": True,  "need_gamma": True},
+        "reg_lasso_logistic":   {"need_lambda": True,  "need_gamma": True},
+    }
+
+    methods = list(method_specs.keys())
+
+    # init storage
+    curves = {m: {} for m in methods}
+    best_by_method = {
+        m: {"degree": None, "lambda": None, "gamma": None, "test_loss": np.inf}
+        for m in methods
+    }
+
+    # build K-fold indices
     k_indices = build_k_indices(y, k_fold, seed)
 
-    methods = ["mse_gd","mse_sgd","least_squares","ridge","logistic","reg_logistic"]
-    curves_tr = {m: [] for m in methods}
-    curves_te = {m: [] for m in methods}
+    # precompute total steps for pretty progress info
+    def n_combos(spec):
+        need_l, need_g = spec["need_lambda"], spec["need_gamma"]
+        if need_l and need_g:
+            return len(lambdas) * len(gammas)
+        elif need_l:
+            return len(lambdas)
+        elif need_g:
+            return len(gammas)
+        else:
+            return 1
 
-    for lambda_ in lambdas:
-        sums_tr = {m: 0.0 for m in methods}
-        sums_te = {m: 0.0 for m in methods}
+    total_steps = sum(
+        n_combos(method_specs[m]) * len(degrees)
+        for m in methods
+    )
+    step = 0
 
-        for k in range(k_fold):
-            print(f"lambda={lambda_}, fold={k}")
-            print("'\n")
-            res = cross_validation(y, x, k_indices, k, lambda_, degree, initial_w, max_iters, gamma)
-            for m in methods:
-                tr_k, te_k = res[m]
-                sums_tr[m] += tr_k
-                sums_te[m] += te_k
+    # loop over polynomial degrees
+    for degree in degrees:
+        # figure out correct w0 length for this degree
+        X_tmp = build_poly(x, degree)
+        w0 = init_w_for_degree(initial_w, X_tmp.shape[1])
 
         for m in methods:
-            curves_tr[m].append(sums_tr[m] / k_fold)
-            curves_te[m].append(sums_te[m] / k_fold)
+            spec = method_specs[m]
+            need_l, need_g = spec["need_lambda"], spec["need_gamma"]
 
-    # Choose “best” lambda per method by min test loss
-    best_by_method = {}
-    for m in methods:
-        arr = np.array(curves_te[m])
-        best_idx = int(np.argmin(arr))
-        best_by_method[m] = (lambdas[best_idx], arr[best_idx])
+            # prepare curve containers for this degree+method
+            if need_l and need_g:
+                curves[m][degree] = {
+                    "lambdas": np.array(lambdas, dtype=float),
+                    "gammas": np.array(gammas, dtype=float),
+                    "train": np.zeros((len(gammas), len(lambdas)), dtype=float),
+                    "test":  np.zeros((len(gammas), len(lambdas)), dtype=float),
+                }
+            elif need_l:
+                curves[m][degree] = {
+                    "lambdas": np.array(lambdas, dtype=float),
+                    "train": np.zeros(len(lambdas), dtype=float),
+                    "test":  np.zeros(len(lambdas), dtype=float),
+                }
+            elif need_g:
+                curves[m][degree] = {
+                    "gammas": np.array(gammas, dtype=float),
+                    "train": np.zeros(len(gammas), dtype=float),
+                    "test":  np.zeros(len(gammas), dtype=float),
+                }
+            else:
+                curves[m][degree] = {
+                    "train": 0.0,
+                    "test":  0.0,
+                }
 
+            # now actually run CV sweeps
+            if need_l and need_g:
+                # double loop
+                for gi, gamma in enumerate(gammas):
+                    for li, lambda_ in enumerate(lambdas):
 
-    plot_all_methods(lambdas, curves_tr, curves_te)
+                        # progress print
+                        step += 1
+                        if verbose:
+                            print(
+                                f"[{step}/{total_steps}] method={m}, degree={degree}, "
+                                f"gamma={gamma:.3g}, lambda={lambda_:.3g}"
+                            )
 
-    # summary
-    print(f"Degree = {degree}, K = {k_fold}")
-    for m in methods:
-        lam, loss = best_by_method[m]
-        print(f"[{m:13s}] best lambda = {lam:.5g} | best test loss = {loss:.4f}")
+                        # accumulate fold results
+                        tr_sum = 0.0
+                        te_sum = 0.0
+                        for k in range(k_fold):
+                            tr_k, te_k = cross_validation_single(
+                                y, x, k_indices, k,
+                                lambda_, degree,
+                                w0, max_iters, gamma,
+                                m
+                            )
+                            tr_sum += tr_k
+                            te_sum += te_k
 
-    return best_by_method, curves_tr, curves_te
+                        tr_avg = tr_sum / k_fold
+                        te_avg = te_sum / k_fold
 
+                        curves[m][degree]["train"][gi, li] = tr_avg
+                        curves[m][degree]["test"][gi,  li] = te_avg
 
+                        # track best
+                        if te_avg < best_by_method[m]["test_loss"]:
+                            best_by_method[m] = {
+                                "degree": degree,
+                                "lambda": float(lambda_),
+                                "gamma": float(gamma),
+                                "test_loss": float(te_avg),
+                            }
 
-### CROSS VALIDATION DEMO (ALL MODELS) FOR ALL DEGREES AND GAMMAS ###
-def cross_validation_demo_all(y, x, degrees, k_fold, lambdas, initial_w, max_iters, gammas, seed=12):
+            elif need_l:
+                # sweep only lambdas
+                for li, lambda_ in enumerate(lambdas):
 
+                    step += 1
+                    if verbose:
+                        print(
+                            f"[{step}/{total_steps}] method={m}, degree={degree}, "
+                            f"lambda={lambda_:.3g}"
+                        )
 
-    k_indices = build_k_indices(y, k_fold, seed)
+                    tr_sum = 0.0
+                    te_sum = 0.0
+                    for k in range(k_fold):
+                        tr_k, te_k = cross_validation_single(
+                            y, x, k_indices, k,
+                            lambda_, degree,
+                            w0, max_iters, gamma=None,
+                            method=m
+                        )
+                        tr_sum += tr_k
+                        te_sum += te_k
 
-    methods = ["mse_gd","mse_sgd","least_squares","ridge","logistic","reg_logistic"]
+                    tr_avg = tr_sum / k_fold
+                    te_avg = te_sum / k_fold
 
-    # curves[method][degree][gamma] = (lambdas_array, tr_losses_array, te_losses_array)
-    curves = {m: {} for m in methods}
+                    curves[m][degree]["train"][li] = tr_avg
+                    curves[m][degree]["test"][li]  = te_avg
 
-    best_by_method = {m: {"degree": None, "lambda": None, "gamma": None, "test_loss": np.inf} for m in methods}
+                    if te_avg < best_by_method[m]["test_loss"]:
+                        best_by_method[m] = {
+                            "degree": degree,
+                            "lambda": float(lambda_),
+                            "gamma": None,
+                            "test_loss": float(te_avg),
+                        }
 
-    for degree in degrees:
-        X_tmp = build_poly(x, degree)
-        if initial_w is not None and len(initial_w) != X_tmp.shape[1]:
-            w0 = np.zeros(X_tmp.shape[1], dtype=float)
-        else:
-            w0 = initial_w
+            elif need_g:
+                # sweep only gammas
+                for gi, gamma in enumerate(gammas):
 
-        for gamma in gammas:
-            for m in methods:
-                curves[m].setdefault(degree, {})
-                curves[m][degree][gamma] = (lambdas.copy(), np.zeros_like(lambdas, dtype=float), np.zeros_like(lambdas, dtype=float))
+                    step += 1
+                    if verbose:
+                        print(
+                            f"[{step}/{total_steps}] method={m}, degree={degree}, "
+                            f"gamma={gamma:.3g}"
+                        )
 
-            # sweep lambdas
-            for li, lambda_ in enumerate(lambdas):
-        
-                sums_tr = {m: 0.0 for m in methods}
-                sums_te = {m: 0.0 for m in methods}
+                    tr_sum = 0.0
+                    te_sum = 0.0
+                    for k in range(k_fold):
+                        tr_k, te_k = cross_validation_single(
+                            y, x, k_indices, k,
+                            lambda_=0.0,  # ignored by these methods
+                            degree=degree,
+                            initial_w=w0,
+                            max_iters=max_iters,
+                            gamma=gamma,
+                            method=m
+                        )
+                        tr_sum += tr_k
+                        te_sum += te_k
 
-                # folds
+                    tr_avg = tr_sum / k_fold
+                    te_avg = te_sum / k_fold
+
+                    curves[m][degree]["train"][gi] = tr_avg
+                    curves[m][degree]["test"][gi]  = te_avg
+
+                    if te_avg < best_by_method[m]["test_loss"]:
+                        best_by_method[m] = {
+                            "degree": degree,
+                            "lambda": None,
+                            "gamma": float(gamma),
+                            "test_loss": float(te_avg),
+                        }
+
+            else:
+                # no hyperparams at all -> single fit
+                step += 1
+                if verbose:
+                    print(f"[{step}/{total_steps}] method={m}, degree={degree} (no hp)")
+
+                tr_sum = 0.0
+                te_sum = 0.0
                 for k in range(k_fold):
-                    res = cross_validation(
+                    tr_k, te_k = cross_validation_single(
                         y, x, k_indices, k,
-                        lambda_, degree,
-                        w0, max_iters, gamma
+                        lambda_=0.0,
+                        degree=degree,
+                        initial_w=w0,
+                        max_iters=max_iters,
+                        gamma=0.0,
+                        method=m
                     )
-                    for m in methods:
-                        tr_k, te_k = res[m]
-                        sums_tr[m] += tr_k
-                        sums_te[m] += te_k
+                    tr_sum += tr_k
+                    te_sum += te_k
+                tr_avg = tr_sum / k_fold
+                te_avg = te_sum / k_fold
 
+                curves[m][degree]["train"] = tr_avg
+                curves[m][degree]["test"]  = te_avg
 
-                for m in methods:
-                    lambdas_arr, tr_arr, te_arr = curves[m][degree][gamma]
-                    tr_arr[li] = sums_tr[m] / k_fold
-                    te_arr[li] = sums_te[m] / k_fold
-                    curves[m][degree][gamma] = (lambdas_arr, tr_arr, te_arr)
-
-  
-            for m in methods:
-                lambdas_arr, _tr_arr, te_arr = curves[m][degree][gamma]
-                bi = int(np.argmin(te_arr))
-                best_te = te_arr[bi]
-                if best_te < best_by_method[m]["test_loss"]:
+                if te_avg < best_by_method[m]["test_loss"]:
                     best_by_method[m] = {
                         "degree": degree,
-                        "lambda": float(lambdas_arr[bi]),
-                        "gamma": gamma,
-                        "test_loss": float(best_te),
+                        "lambda": None,
+                        "gamma": None,
+                        "test_loss": float(te_avg),
                     }
 
-    # summary
+    # SUMMARY PRINT
+    print("\n=== CV SUMMARY ===")
     print(f"K-fold = {k_fold}")
     for m in methods:
         info = best_by_method[m]
-        print(f"[{m:13s}] best: degree={info['degree']}, lambda={info['lambda']:.5g}, "
-              f"gamma={info['gamma']}, test_loss={info['test_loss']:.6f}")
+        lam  = "None" if info["lambda"] is None else f"{info['lambda']:.5g}"
+        gam  = "None" if info["gamma"]  is None else f"{info['gamma']:.5g}"
+        print(
+            f"[{m:18s}] "
+            f"best: degree={info['degree']}, "
+            f"lambda={lam}, gamma={gam}, "
+            f"test_loss={info['test_loss']:.6f}"
+        )
 
     return best_by_method, curves
+
+
+###############################################################################
+# PLOTTING
+###############################################################################
+
+def plot_cv_results(curves, method, degree, show_train=True, log_x=True):
+    """
+    Nice plotting for a single method @ one degree.
+
+    - if method only uses lambda: plot test/train vs lambda
+    - if method only uses gamma:  plot test/train vs gamma
+    - if method uses both:       show heatmap (gamma vs lambda)
+    - if method uses neither:    just print the scalar
+
+    Parameters
+    ----------
+    curves : output from cross_validation_demo_all
+    method : str, one of keys of `curves`
+    degree : the degree you want to visualize
+    show_train : bool, also plot training curve
+    log_x : bool, use log-scale on x-axis for 1D sweeps
+    """
+
+    data = curves[method][degree]
+
+    # figure out what hyperparams exist in this curve
+    has_lambda = "lambdas" in data
+    has_gamma  = "gammas"  in data
+
+    if not has_lambda and not has_gamma:
+        # trivial case
+        test_loss = data["test"]
+        train_loss = data["train"]
+        print(
+            f"{method} (degree={degree}): "
+            f"train={train_loss:.4f}, test={test_loss:.4f}"
+        )
+        return
+
+    if has_lambda and not has_gamma:
+        # 1D sweep over lambda
+        lambdas_arr = data["lambdas"]
+        te_arr = data["test"]
+        tr_arr = data["train"]
+
+        plt.figure()
+        if show_train:
+            plt.plot(lambdas_arr, tr_arr, marker="o", label="train")
+        plt.plot(lambdas_arr, te_arr, marker="s", label="test")
+        plt.xlabel("lambda")
+        plt.ylabel("loss")
+        plt.title(f"{method} | degree={degree}")
+        plt.grid(True)
+        plt.legend()
+        if log_x:
+            plt.xscale("log")
+        plt.show()
+        return
+
+    if has_gamma and not has_lambda:
+        # 1D sweep over gamma
+        gammas_arr = data["gammas"]
+        te_arr = data["test"]
+        tr_arr = data["train"]
+
+        plt.figure()
+        if show_train:
+            plt.plot(gammas_arr, tr_arr, marker="o", label="train")
+        plt.plot(gammas_arr, te_arr, marker="s", label="test")
+        plt.xlabel("gamma")
+        plt.ylabel("loss")
+        plt.title(f"{method} | degree={degree}")
+        plt.grid(True)
+        plt.legend()
+        if log_x:
+            plt.xscale("log")
+        plt.show()
+        return
+
+    if has_gamma and has_lambda:
+        # 2D grid -> heatmap of test loss
+        gammas_arr = data["gammas"]
+        lambdas_arr = data["lambdas"]
+        test_grid = data["test"]  # shape [len(gammas), len(lambdas)]
+
+        plt.figure()
+        # imshow expects [row, col] so row -> gamma index, col -> lambda index
+        im = plt.imshow(
+            test_grid,
+            origin="lower",
+            aspect="auto",
+        )
+        plt.colorbar(im, label="test loss")
+
+        # ticks: try to show a few readable ticks
+        # we'll choose ~5 ticks max for clarity
+        max_ticks = 5
+        g_idx = np.linspace(0, len(gammas_arr) - 1, num=min(len(gammas_arr), max_ticks)).astype(int)
+        l_idx = np.linspace(0, len(lambdas_arr) - 1, num=min(len(lambdas_arr), max_ticks)).astype(int)
+
+        plt.xticks(l_idx, [f"{lambdas_arr[i]:.2g}" for i in l_idx], rotation=45)
+        plt.yticks(g_idx, [f"{gammas_arr[i]:.2g}" for i in g_idx])
+
+        plt.xlabel("lambda")
+        plt.ylabel("gamma")
+        plt.title(f"{method} | degree={degree} | test loss heatmap")
+        plt.tight_layout()
+        plt.show()
+        return
+
+
 
