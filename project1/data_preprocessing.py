@@ -2,31 +2,7 @@ import numpy as np
 from helpers import *
 from itertools import combinations_with_replacement
 from frequency_processing import *
-
-def remove_useless(data: np.ndarray, annotated_data: np.ndarray) -> np.ndarray:
-    """Removes useless features from the dataset based on annotated data.
-
-    Args:
-        data (np.ndarray): The input data array.
-        annotated_data (np.ndarray): The annotated data array indicating useful features.
-
-    Returns:
-        np.ndarray: The data array with useless features removed.
-    """
-    mask = annotated_data[:, 0] != '0'               
-    if mask.shape[0] != data.shape[1]:
-        raise ValueError(f"Annotation length {mask.shape[0]} != n_features {data.shape[1]}")
-    return data[:, mask], mask
-
-def remove_nan(x_train, x_test):
-    bool_nan = np.isnan(x_train)
-    nan_ratio = np.mean(bool_nan, axis=0)
-    mask = nan_ratio < 0.25
-    x_train = x_train[:, mask]
-    x_test = x_test[:, mask]
-    return x_train, x_test, mask
-
-def read_annotated_csv(path, delimiter=',', skip_header=0, important_feat_only = False):
+def read_annotated_csv(path, delimiter=',', skip_header=0):
     """Reads a CSV file and returns the data as a NumPy array.
 
     Args:
@@ -37,20 +13,8 @@ def read_annotated_csv(path, delimiter=',', skip_header=0, important_feat_only =
     Returns:
         np.ndarray: The data from the CSV file as a NumPy array.
     """
-    if important_feat_only is True : 
-        data =  np.genfromtxt(
-        path,
-        delimiter=",",
-        skip_header=0,
-        dtype=str,            # or None
-        autostrip=True,
-        comments=None,
-        invalid_raise=False,    # don't error on inconsistent rows
-        usecols=range(11),       # force 7 columns
-        filling_values=np.nan
-    )[1:,1:11]
-    else : 
-        data = np.genfromtxt(
+
+    data = np.genfromtxt(
             path,
             delimiter=",",
             skip_header=skip_header,
@@ -64,24 +28,15 @@ def read_annotated_csv(path, delimiter=',', skip_header=0, important_feat_only =
 
     return data
 
-def remove_constant(x_train, x_test):
-    """Removes constant features from the dataset.
-
-    Args:
-        x_train (np.ndarray): The training data array.
-        x_test (np.ndarray): The testing data array.
-    Returns:
-        np.ndarray, np.ndarray: The training and testing data arrays with constant features removed.
-    """
-    std_dev = np.std(x_train, axis=0)
-    mask = std_dev != 0
-    x_train = x_train[:, mask]
-    x_test = x_test[:, mask]
-    return x_train, x_test, mask
-
-
 def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important_feat_only = False):
     """
+    This function is responsible for the whole preprocessing of the datasets. It calls the relevant functions, namely : 
+        - Remove features with excessive NaN values
+        - Remove constant (non-informative) features based on the std of the feature
+        - Handles categorical features with frequency-based encoding
+        - Removes the useless features based on the artifically created csv
+        - If Important feat only is True : we select only 22 features (for interaction) based on some paper, mentioned in the report
+        - Cleans and encodes the data using clean_data : clean data description is available below
     Calls the relevant functions : 
             - removes the useless features based on the annotated csv files
             - cleans the dataset and encodes it
@@ -89,17 +44,14 @@ def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important
 
     Returns : x_train,y_train,x_test : the datasets contained in numpy arrays  
     """
-    x_train_no_nan, x_test_no_nan, mask = remove_nan(x_train_raw, x_test_raw)
-    annotated_data = annotated_data[mask,:]
- 
-    x_train_no_nan, x_test_no_nan, mask = remove_constant(x_train_no_nan, x_test_no_nan)
-    annotated_data = annotated_data[mask,:]
+    x_train_no_nan, x_test_no_nan, annotated_data = remove_nan(x_train_raw, x_test_raw,annotated_data)
+    x_train_no_nan, x_test_no_nan, annotated_data = remove_constant(x_train_no_nan, x_test_no_nan,annotated_data)
 
     # dealing with the frequency issue
     x_train_no_nan = deal_with_frequencies(x_train_no_nan, annotated_data)
     x_test_no_nan = deal_with_frequencies(x_test_no_nan, annotated_data)
 
-
+    #Remove useless features based on our annotated dataset
     x_train_filtered, mask = remove_useless(x_train_no_nan, annotated_data)
     x_test_filtered,mask = remove_useless(x_test_no_nan, annotated_data)
     annotated_data = annotated_data[mask,:]
@@ -120,10 +72,66 @@ def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important
     x_test = np.hstack((np.ones((x_test.shape[0],1)), x_test))
     return x_train, y_train, x_test
 
+def remove_nan(x_train, x_test, annotated_data):
+    """
+    Removes features (columns) with too many missing values (NaNs) from the dataset.
+
+    This function calculates the proportion of NaN values in each feature of the 
+    training set and removes any features whose NaN ratio exceeds 25%. 
+    The same feature mask is then applied to the test set to ensure consistency
+
+    Args : 
+        x_train (np.ndarray) : the original training set
+        x_test (np.ndarray) : the test set
+    Returns : 
+        x_train (np.ndarray) : the training set with the features with more than 25% NaNs removed
+        x_test (np.ndarray) : the test set with the features with more than 25% NaNs (in train set) removed
+        annotated_data (np.ndarray) : the artificial csv with the corresponding features removed (to keep track of indices!)
+    """
+    bool_nan = np.isnan(x_train)
+    nan_ratio = np.mean(bool_nan, axis=0)
+    mask = nan_ratio < 0.25
+    x_train = x_train[:, mask]
+    x_test = x_test[:, mask]
+    annotated_data = annotated_data[mask,:]
+    return x_train, x_test, annotated_data
+
+
+def remove_constant(x_train, x_test,annotated_data):
+    """Removes constant features from the dataset.
+
+    Args:
+        x_train (np.ndarray): The training data array.
+        x_test (np.ndarray): The testing data array.
+    Returns:
+        np.ndarray, np.ndarray: The training and testing data arrays with constant features removed.
+    """
+    std_dev = np.std(x_train, axis=0)
+    mask = std_dev != 0
+    x_train = x_train[:, mask]
+    x_test = x_test[:, mask]
+    annotated_data = annotated_data[mask,:]
+    return x_train, x_test, annotated_data
+
+
+def remove_useless(data: np.ndarray, annotated_data: np.ndarray) -> np.ndarray:
+    """Removes useless features from the dataset based on annotated data.
+
+    Args:
+        data (np.ndarray): The input data array.
+        annotated_data (np.ndarray): The annotated data array indicating useful features.
+
+    Returns:
+        np.ndarray: The data array with useless features removed.
+    """
+    mask = annotated_data[:, 0] != '0'               
+    if mask.shape[0] != data.shape[1]:
+        raise ValueError(f"Annotation length {mask.shape[0]} != n_features {data.shape[1]}")
+    return data[:, mask], mask
+
 
 def clean_data(data, data_annotated, test = False, categories_list = None, important_feat_only = False) :
     """
-
     Cleans and processes the dataset by separating,transforming and merging back categorical and numerical features. 
     
     This function uses an annotated dataset ('data_annoted') which contains relevant informations concerning the features
@@ -350,26 +358,7 @@ def fill_specials(x_train, annotated_data):
         x_train[:, index] = np.where(np.isin(x_train[:, index], special), np.nan, x_train[:, index])
     return x_train
 
-def preprocess_data(x_train_raw: np.ndarray, x_test_raw: np.ndarray, annotated_data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Preprocesses the training and testing data by removing useless features.
 
-    Args:
-        x_train_raw (np.ndarray): The raw training data.
-        x_test_raw (np.ndarray): The raw testing data.
-        annotated_data (np.ndarray): The annotated data array indicating useful features.
-
-    Returns:
-        tuple[np.ndarray, np.ndarray]: The preprocessed training and testing data.
-    """
-    x_train, x_test, mask = remove_nan(x_train, x_test)
-    annotated_data = annotated_data[mask,:]
-    x_train = remove_useless(x_train_raw, annotated_data)
-    x_test = remove_useless(x_test_raw, annotated_data)
-    x_train = fill_specials(x_train, annotated_data)
-    x_test = fill_specials(x_test, annotated_data)
-    
-
-    return x_train, x_test
 
 
 
