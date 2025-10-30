@@ -64,6 +64,20 @@ def read_annotated_csv(path, delimiter=',', skip_header=0, important_feat_only =
 
     return data
 
+def remove_constant(x_train, x_test):
+    """Removes constant features from the dataset.
+
+    Args:
+        x_train (np.ndarray): The training data array.
+        x_test (np.ndarray): The testing data array.
+    Returns:
+        np.ndarray, np.ndarray: The training and testing data arrays with constant features removed.
+    """
+    std_dev = np.std(x_train, axis=0)
+    mask = std_dev != 0
+    x_train = x_train[:, mask]
+    x_test = x_test[:, mask]
+    return x_train, x_test, mask
 
 
 def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important_feat_only = False):
@@ -78,6 +92,9 @@ def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important
     x_train_no_nan, x_test_no_nan, mask = remove_nan(x_train_raw, x_test_raw)
     annotated_data = annotated_data[mask,:]
  
+    x_train_no_nan, x_test_no_nan, mask = remove_constant(x_train_no_nan, x_test_no_nan)
+    annotated_data = annotated_data[mask,:]
+
     # dealing with the frequency issue
     x_train_no_nan = deal_with_frequencies(x_train_no_nan, annotated_data)
     x_test_no_nan = deal_with_frequencies(x_test_no_nan, annotated_data)

@@ -373,6 +373,8 @@ def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None, detail
     y_pred[y_pred <= threshold] = 0
     y_pred[y_pred > threshold] = 1
     if mode == 'submission':
+        # transform all 0 predictions to -1 for submission format
+        y_pred[y_pred == 0] = -1
         return 0, y_pred
     computed_accuracy = np.sum(y_pred == y_test)/len(y_test)
     if detailed:
