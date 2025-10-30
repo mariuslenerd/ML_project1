@@ -1,4 +1,22 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+
+def plot_nans_hist(data): 
+    """
+    
+    
+    """
+    nan_counts = np.isnan(data).sum(axis=0)
+    plt.figure(figsize=(8,6))
+    plt.hist(nan_counts, bins=50,color = 'red', edgecolor='black')
+    plt.xlabel("Number of NaNs in a column")
+    plt.ylabel("Number of columns")
+    plt.title("Distribution of NaNs per column")
+    plt.show()
+
+def plot_data_imbalance(data) : 
+    count_ill = len(data[data] == 1)
 
 def cross_validation_visualization(lambds, rmse_tr, rmse_te, title_suffix=""):
     import matplotlib.pyplot as plt
