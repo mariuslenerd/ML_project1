@@ -366,7 +366,8 @@ def compute_f1_score(y_true, y_pred):
     return f1
 
 def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None, detailed=True):
-    if method in ["Logistic", "Regularized Logistic", "Regularized Lasso"]:
+    
+    if method in ["logistic", "Regularized Logistic", "reg_lasso_logistic"]:
         y_pred = sigmoid(x_test@w)
     else:
         y_pred = x_test@w

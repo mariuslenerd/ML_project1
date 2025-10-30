@@ -30,6 +30,7 @@ np.savetxt('dataset/x_test_preprocessed.csv', x_test_final, delimiter=',')
 print("Loading data...")
 x_train = np.loadtxt('project1/x_train_preprocessed.csv', delimiter=',')
 y_train = np.loadtxt('project1/y_train_preprocessed.csv', delimiter=',')
+x_test_final = np.loadtxt('project1/x_test_preprocessed.csv', delimiter=',')
 y_train[y_train == -1] = 0
 
 print("Loading best parameters...")
@@ -40,7 +41,7 @@ print("Data loaded.")
 #print(x_train.shape)
 
 x_train,x_test,y_train,y_test = data_preprocessing.split_data(x_train, y_train, 0.8, seed=1)
-max_iters = 250
+max_iters = 50
 
 functions = {
     "least_squares": class_weighted_least_squares,
@@ -51,7 +52,7 @@ functions = {
     "reg_logistic": reg_logistic_regression,
 }
 
-models = ["least_squares", "mse_sgd", "reg_lasso_logistic", "ridge", "logistic", "reg_logistic"]
+models = ["least_squares", "mse_sgd", "reg_lasso_logistic", "ridge", "logistic"]
 
 results = {}  
 
@@ -89,6 +90,8 @@ for i, (model, info) in enumerate(results.items(), start=1):
     print(f"Threshold {i}: {model}")
     best_thresholds[model] = test_thresholds(info["x_te"], y_test, info["weight"], model)
 
+
+
 for model, info in results.items():
     threshold = best_thresholds[model]
     accuracy, y_pred = implemented_functions.compute_accuracy(y_test, info["x_te"], info["weight"], model, threshold)
@@ -97,11 +100,10 @@ for model, info in results.items():
 
 
 # This part of the code can be used to generate predictions for the ai crowd test set once the best model and threshold are selected
-'''
-print("Generating predictions for test set...")
-x_test_poly = data_preprocessing.build_poly(x_test_final, int(logistic_param['degree']))
-acc, y_pred_test = implemented_functions.compute_accuracy(None, x_test_poly, w_logistic, "Logistic", logistic_best_threshold, mode = 'submission')
+for model, info in results.items():
+    print("Generating predictions for test set...")
+    x_test_poly = data_preprocessing.build_poly(x_test_final, int(info['degree']))
+    acc, y_pred_test = implemented_functions.compute_accuracy(None, x_test_poly, info["weight"], model, best_thresholds[model], mode = 'submission')
 
-ids = [i for i in range(328135, 437513+1)]
-create_csv_submission(ids, y_pred_test, 'results/submission.csv')
-'''
+    ids = [i for i in range(328135, 437513+1)]
+    create_csv_submission(ids, y_pred_test, 'project1/results/submission_' + model + '.csv')

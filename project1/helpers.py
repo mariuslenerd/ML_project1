@@ -99,7 +99,7 @@ def test_thresholds(x_test, y_test, weights, method):
         accuracy, y_pred = implemented_functions.compute_accuracy(y_test, x_test, weights, method, threshold, detailed=False)
         f1_score = implemented_functions.compute_f1_score(y_test, y_pred)
         f1_scores.append(f1_score)
-        if 5*f1_score + accuracy >= best_weighted_f1:
+        if (5*f1_score + accuracy) >= best_weighted_f1:
             best_weighted_f1 = 5*f1_score + accuracy
             best_threshold = threshold
         accuracies.append(accuracy)
