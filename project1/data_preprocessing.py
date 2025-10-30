@@ -16,7 +16,7 @@ def remove_useless(data: np.ndarray, annotated_data: np.ndarray) -> np.ndarray:
     mask = annotated_data[:, 0] != '0'               
     if mask.shape[0] != data.shape[1]:
         raise ValueError(f"Annotation length {mask.shape[0]} != n_features {data.shape[1]}")
-    return data[:, mask] 
+    return data[:, mask], mask
 
 def remove_nan(x_train, x_test):
     bool_nan = np.isnan(x_train)
@@ -58,7 +58,7 @@ def read_annotated_csv(path, delimiter=',', skip_header=0, important_feat_only =
             autostrip=True,
             comments=None,
             invalid_raise=False,    # don't error on inconsistent rows
-            usecols=range(12),       # force 7 columns
+            usecols=range(12),       
             filling_values=np.nan
         )[1:,1:12]
 
@@ -77,14 +77,16 @@ def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important
     """
     x_train_no_nan, x_test_no_nan, mask = remove_nan(x_train_raw, x_test_raw)
     annotated_data = annotated_data[mask,:]
-
+ 
     # dealing with the frequency issue
     x_train_no_nan = deal_with_frequencies(x_train_no_nan, annotated_data)
     x_test_no_nan = deal_with_frequencies(x_test_no_nan, annotated_data)
 
 
-    x_train_filtered = remove_useless(x_train_no_nan, annotated_data)
-    x_test_filtered = remove_useless(x_test_no_nan, annotated_data)
+    x_train_filtered, mask = remove_useless(x_train_no_nan, annotated_data)
+    x_test_filtered,mask = remove_useless(x_test_no_nan, annotated_data)
+    annotated_data = annotated_data[mask,:]
+
     if important_feat_only is True : 
         x_train, categories_list = clean_data(x_train_filtered, annotated_data,important_feat_only=True)
         x_test,categories_list = clean_data(x_test_filtered, annotated_data,test = True,categories_list = categories_list,important_feat_only=True)
@@ -123,7 +125,7 @@ def clean_data(data, data_annotated, test = False, categories_list = None, impor
         data_clean (np.ndarray) : Fully processed dataset with encoded categorical variables and normalized numerical features
     """
     #Remove useless features : 
-    data_annotated = data_annotated[data_annotated[:,0] != '0'] 
+    #data_annotated = data_annotated[data_annotated[:,0] != '0'] 
 
     if important_feat_only is True : 
         idx_categorical = np.where(((data_annotated[:,1] != '0') | (data_annotated[:,2]!= '0')) & (data_annotated[:,7] == '1'))[0]
@@ -144,12 +146,12 @@ def clean_data(data, data_annotated, test = False, categories_list = None, impor
     data_numerical =  deal_with_specials(data_annotated_numerical, data_numerical)
     data_categorical = deal_with_specials(data_annotated_categorical, data_categorical)
 
-    #Fill NaN(by -10) and normalize numerical features
-    nan_mask = np.isnan(data_numerical).astype(float)   
-    data_filled = np.nan_to_num(data_numerical, nan=-10.0) #i replaced NaN by -10 instead of 0 
-    data_numerical_encoded = np.concatenate([data_filled, nan_mask], axis=1)
-    numerical_normalized = normalize_data(data_numerical_encoded)
-    numerical_normalized = np.nan_to_num(numerical_normalized, nan=0.0)
+    #Replace the remaining NaN's (when % of Nans of the feature is <25%) of the numerical features by the median value of the feature
+    col_median = np.nanmedian(data_numerical, axis = 0)
+    mask_nan = np.where(np.isnan(data_numerical))
+    data_numerical[mask_nan] = np.take(col_median, mask_nan[1])
+    numerical_normalized = normalize_data(data_numerical)
+    
 
     #One-hot encode categorical features
     if test is True : 
