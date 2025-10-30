@@ -3,37 +3,34 @@ import numpy as np
 # ---------- MP-based dimensionality reduction ----------
 def mp_dim_reduction(X_tr,X_te):
     """
-    Standardize → correlation → eigendecompose → keep evals > lambda_plus.
-    Returns projected data Z_mp and bookkeeping to compare with PCA.
+    Standardize, correlation,  eigendecompose, keep evals > lambda_plus.
     """
     T, d = X_tr.shape
 
-    # Standardize (population mean, sample std with ddof=1 is common for correlation)
+    # Standardize 
     mu_tr = np.mean(X_tr, axis=0)
     sd_tr = np.std(X_tr, axis=0, ddof=1)
-
-
     Xc_tr = (X_tr - mu_tr) / sd_tr
     Xc_te = (X_te - mu_tr) / sd_tr
 
     # Correlation matrix and eigendecomposition
     S = (Xc_tr.T @ Xc_tr) / T      # correlation
-    evals, evecs = np.linalg.eigh(S)  # ascending
+    evals, evecs = np.linalg.eigh(S) 
     # MP edge (sigma^2=1 in correlation)
     lam = d / T
     lam_plus = (1 + np.sqrt(lam))**2
 
     # Keep signal components
     mask = evals > lam_plus
-    idx_mp = np.where(mask)[0]             # indices in ascending order
+    idx_mp = np.where(mask)[0]            
     k_mp = idx_mp.size
     if k_mp == 0:
         # fallback: keep at least 1 component to avoid empty space
         idx_mp = np.array([evals.argmax()])
         k_mp = 1
-    W_mp = evecs[:, idx_mp]                # columns = kept eigenvectors
-    Z_mp = Xc_tr @ W_mp                       # projected data
-    Z_te_mp = Xc_te @ W_mp
+    W_mp = evecs[:, idx_mp]                
+    Z_mp = Xc_tr @ W_mp # projected train data
+    Z_te_mp = Xc_te @ W_mp # projected test data
 
     EVR = evals / np.sum(evals)
     order_desc = np.argsort(evals)[::-1]
@@ -51,16 +48,15 @@ def PCA_threshold(X_tr,X_te, threshold):
     """
     T, d = X_tr.shape
 
-    # Standardize (population mean, sample std with ddof=1 is common for correlation)
     mu_tr = np.mean(X_tr, axis=0)
     sd_tr = np.std(X_tr, axis=0, ddof=1)
 
     Xc_tr = (X_tr - mu_tr) / sd_tr
     Xc_te = (X_te - mu_tr) / sd_tr
-    # Correlation matrix via 1/T
+    # Correlation matrix 
     S = (Xc_tr.T @ Xc_tr) / T
-    eigvals, eigvecs = np.linalg.eigh(S)       # ascending
-    # sort descending for PCA convention
+    eigvals, eigvecs = np.linalg.eigh(S)     
+
     idx_desc = np.argsort(eigvals)[::-1]
     eigvals = eigvals[idx_desc]
     eigvecs = eigvecs[:, idx_desc]
@@ -71,12 +67,10 @@ def PCA_threshold(X_tr,X_te, threshold):
     k = min(k, d)
 
     W = eigvecs[:, :k]
-    Z_train= Xc_tr @ W
-    Z_test = Xc_te @ W
+    Z_train= Xc_tr @ W # projected train data
+    Z_test = Xc_te @ W # projected test data
 
-    # Map back to original (ascending) indices if you need overlap checks
     idx_col = idx_desc[:k]
 
     return Z_train,Z_test, k, idx_col, eigvals, EVR, cumEVR
 
-## If k_MP is much smaller than k_PCA at your threshold, MP is telling that some of the variance PCA wants to keep looks like noise in high dimensions

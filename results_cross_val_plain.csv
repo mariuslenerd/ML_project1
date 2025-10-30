@@ -1,0 +1,9 @@
+method,degree,lambda,gamma,test_loss
+mse_gd,4,None,0.01,0.4057070529452435
+mse_sgd,1,None,0.01,0.3570153194931051
+least_squares,1,None,None,0.25588835398747534
+ridge,1,100.0,None,0.28085611179430686
+logistic,4,None,0.1,0.48364023094970426
+reg_logistic,4,0.001,0.1,0.4839366907821899
+reg_lasso_logistic,1,0.001,0.01,0.003925208947342609
+

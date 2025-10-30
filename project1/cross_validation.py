@@ -25,10 +25,6 @@ def build_k_indices(y, k_fold, seed):
     k_indices = [indices[k * interval : (k + 1) * interval] for k in range(k_fold)]
     return np.array(k_indices)
 
-
-###############################################################################
-# Helpers
-###############################################################################
 def init_w_for_degree(initial_w, n_features):
     """Return an initial w of the right length for this polynomial degree."""
     if len(initial_w) == n_features:
@@ -98,10 +94,6 @@ def cross_validation_single(
 
     return tr_loss, te_loss
 
-
-###############################################################################
-# MAIN CV DRIVER
-###############################################################################
 
 def cross_validation_demo_all(
     y,
@@ -177,7 +169,7 @@ def cross_validation_demo_all(
     # build K-fold indices
     k_indices = build_k_indices(y, k_fold, seed)
 
-    # precompute total steps for pretty progress info
+    # precompute total steps for progress info
     def n_combos(spec):
         need_l, need_g = spec["need_lambda"], spec["need_gamma"]
         if need_l and need_g:
@@ -230,8 +222,6 @@ def cross_validation_demo_all(
                     "train": 0.0,
                     "test":  0.0,
                 }
-
-            # now actually run CV sweeps
             if need_l and need_g:
                 # double loop
                 for gi, gamma in enumerate(gammas):
@@ -326,7 +316,7 @@ def cross_validation_demo_all(
                     for k in range(k_fold):
                         tr_k, te_k = cross_validation_single(
                             y, x, k_indices, k,
-                            lambda_=0.0,  # ignored by these methods
+                            lambda_=0.0,  
                             degree=degree,
                             initial_w=w0,
                             max_iters=max_iters,
@@ -400,115 +390,6 @@ def cross_validation_demo_all(
 
     return best_by_method, curves
 
-
-###############################################################################
-# PLOTTING
-###############################################################################
-
-def plot_cv_results(curves, method, degree, show_train=True, log_x=True):
-    """
-    Nice plotting for a single method @ one degree.
-
-    - if method only uses lambda: plot test/train vs lambda
-    - if method only uses gamma:  plot test/train vs gamma
-    - if method uses both:       show heatmap (gamma vs lambda)
-    - if method uses neither:    just print the scalar
-
-    Parameters
-    ----------
-    curves : output from cross_validation_demo_all
-    method : str, one of keys of `curves`
-    degree : the degree you want to visualize
-    show_train : bool, also plot training curve
-    log_x : bool, use log-scale on x-axis for 1D sweeps
-    """
-
-    data = curves[method][degree]
-
-    # figure out what hyperparams exist in this curve
-    has_lambda = "lambdas" in data
-    has_gamma  = "gammas"  in data
-
-    if not has_lambda and not has_gamma:
-        # trivial case
-        test_loss = data["test"]
-        train_loss = data["train"]
-        print(
-            f"{method} (degree={degree}): "
-            f"train={train_loss:.4f}, test={test_loss:.4f}"
-        )
-        return
-
-    if has_lambda and not has_gamma:
-        # 1D sweep over lambda
-        lambdas_arr = data["lambdas"]
-        te_arr = data["test"]
-        tr_arr = data["train"]
-
-        plt.figure()
-        if show_train:
-            plt.plot(lambdas_arr, tr_arr, marker="o", label="train")
-        plt.plot(lambdas_arr, te_arr, marker="s", label="test")
-        plt.xlabel("lambda")
-        plt.ylabel("loss")
-        plt.title(f"{method} | degree={degree}")
-        plt.grid(True)
-        plt.legend()
-        if log_x:
-            plt.xscale("log")
-        plt.show()
-        return
-
-    if has_gamma and not has_lambda:
-        # 1D sweep over gamma
-        gammas_arr = data["gammas"]
-        te_arr = data["test"]
-        tr_arr = data["train"]
-
-        plt.figure()
-        if show_train:
-            plt.plot(gammas_arr, tr_arr, marker="o", label="train")
-        plt.plot(gammas_arr, te_arr, marker="s", label="test")
-        plt.xlabel("gamma")
-        plt.ylabel("loss")
-        plt.title(f"{method} | degree={degree}")
-        plt.grid(True)
-        plt.legend()
-        if log_x:
-            plt.xscale("log")
-        plt.show()
-        return
-
-    if has_gamma and has_lambda:
-        # 2D grid -> heatmap of test loss
-        gammas_arr = data["gammas"]
-        lambdas_arr = data["lambdas"]
-        test_grid = data["test"]  # shape [len(gammas), len(lambdas)]
-
-        plt.figure()
-        # imshow expects [row, col] so row -> gamma index, col -> lambda index
-        im = plt.imshow(
-            test_grid,
-            origin="lower",
-            aspect="auto",
-        )
-        plt.colorbar(im, label="test loss")
-
-        # ticks: try to show a few readable ticks
-        # we'll choose ~5 ticks max for clarity
-        max_ticks = 5
-        g_idx = np.linspace(0, len(gammas_arr) - 1, num=min(len(gammas_arr), max_ticks)).astype(int)
-        l_idx = np.linspace(0, len(lambdas_arr) - 1, num=min(len(lambdas_arr), max_ticks)).astype(int)
-
-        plt.xticks(l_idx, [f"{lambdas_arr[i]:.2g}" for i in l_idx], rotation=45)
-        plt.yticks(g_idx, [f"{gammas_arr[i]:.2g}" for i in g_idx])
-
-        plt.xlabel("lambda")
-        plt.ylabel("gamma")
-        plt.title(f"{method} | degree={degree} | test loss heatmap")
-        plt.tight_layout()
-        plt.show()
-        return
 
 
 
