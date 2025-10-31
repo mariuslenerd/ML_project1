@@ -2,8 +2,11 @@ import numpy as np
 from helpers import *
 from itertools import combinations_with_replacement
 from frequency_processing import *
+
+
 def read_annotated_csv(path, delimiter=',', skip_header=0):
-    """Reads a CSV file and returns the data as a NumPy array.
+    """Reads our custom CSV file and returns the data as a NumPy array.
+    This CSV file contains personal notes about each feature
 
     Args:
         path (str): The path to the CSV file.
@@ -28,7 +31,7 @@ def read_annotated_csv(path, delimiter=',', skip_header=0):
 
     return data
 
-def preprocess_data2(x_train_raw, y_train, x_test_raw, annotated_data, important_feat_only = False):
+def preprocess_data(x_train_raw, y_train, x_test_raw, annotated_data, important_feat_only = False):
     """
     This function is responsible for the whole preprocessing of the datasets. It calls the relevant functions, namely : 
         - Remove features with excessive NaN values

@@ -3,7 +3,7 @@
 import csv
 import numpy as np
 import os
-import implemented_functions
+from implemented_functions import *
 import plots
 
 def load_csv_data(data_path, sub_sample=False):
@@ -96,8 +96,8 @@ def test_thresholds(x_test, y_test, weights, method):
     best_threshold = 0
     best_weighted_f1 = 0
     for threshold in np.linspace(0, 1, 20):
-        accuracy, y_pred = implemented_functions.compute_accuracy(y_test, x_test, weights, method, threshold, detailed=False)
-        f1_score = implemented_functions.compute_f1_score(y_test, y_pred)
+        accuracy, y_pred = compute_accuracy(y_test, x_test, weights, method, threshold, detailed=False)
+        f1_score = compute_f1_score(y_test, y_pred)
         f1_scores.append(f1_score)
         if (5*f1_score + accuracy) >= best_weighted_f1:
             best_weighted_f1 = 5*f1_score + accuracy
@@ -114,3 +114,50 @@ def load_best_params(file_path):
     
     best_params = [dict(zip(headers, row)) for row in rows]
     return best_params
+
+def compute_f1_score(y_true, y_pred):
+    """
+    Compute the F1 score given true and predicted binary labels.
+
+    Args:
+        y_true: numpy array of shape (N,), true binary labels (0 or 1)
+        y_pred: numpy array of shape (N,), predicted binary labels (0 or 1)
+    Returns:
+        f1: float, the F1 score
+    """
+    true_positives = np.sum((y_true == 1) & (y_pred == 1))
+    false_positives = np.sum((y_true == 0) & (y_pred == 1))
+    false_negatives = np.sum((y_true == 1) & (y_pred == 0))
+    f1 = 2*true_positives / (2*true_positives + false_positives + false_negatives)
+    return f1
+
+def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None, detailed=True):
+    """
+    Compute accuracy of predictions on test data.
+    Args:
+        y_test: numpy array of shape (N,), true binary labels (0 or 1)
+        x_test: numpy array of shape (N,D), input data
+        w: numpy array of shape (D,), model parameters
+        method: str, method name ("logistic", "Regularized Logistic", etc.)
+        threshold: float, decision threshold for classification
+        mode: str or None, if 'submission', transform 0 predictions to -1
+        detailed: bool, if True, print accuracy
+    Returns:
+        computed_accuracy: float, accuracy of predictions
+        y_pred: numpy array of shape (N,), predicted binary labels (0 or 1)
+    """
+    
+    if method in ["logistic", "Regularized Logistic", "reg_lasso_logistic"]:
+        y_pred = sigmoid(x_test@w)
+    else:
+        y_pred = x_test@w
+    y_pred[y_pred <= threshold] = 0
+    y_pred[y_pred > threshold] = 1
+    if mode == 'submission':
+        # transform all 0 predictions to -1 for submission format
+        y_pred[y_pred == 0] = -1
+        return 0, y_pred
+    computed_accuracy = np.sum(y_pred == y_test)/len(y_test)
+    if detailed:
+        print(f"Accuracy of {method} is {computed_accuracy*100}%")
+    return computed_accuracy, y_pred

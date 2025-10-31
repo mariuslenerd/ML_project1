@@ -188,3 +188,17 @@ def plot_threshold(best_threshold, f1_scores, accuracies, method):
     plt.xlabel('Threshold')
     plt.ylabel('Accuracy')
     plt.show()
+
+def plot_correlation_heatmap(x_train):
+    """
+    Plots a heatmap of the correlation matrix of the features in x_train.
+    Args:
+        x_train (np.array): The training data, shape (N, D).
+    """
+    corr = np.corrcoef(x_train_raw.T)
+    plt.imshow(corr, cmap='hot', interpolation='nearest')
+    plt.colorbar()
+    plt.title('Feature Correlation Matrix Heatmap')
+    plt.show()
+    corr.shape
+

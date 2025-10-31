@@ -1,41 +1,39 @@
 import numpy as np
 import matplotlib.pyplot as plt
-#from helpers import *
 from data_preprocessing import *
 import importlib
 importlib.reload(data_preprocessing)
 import cross_validation
 importlib.reload(cross_validation)
 from implemented_functions import *
-import helpers
-importlib.reload(helpers)
+from helpers import *
 import PCA
 importlib.reload(PCA)
 import os
 
 
-print("Loading data...")
+"""print("Loading data...")
 x_train_raw, x_test_raw,y_train_raw, train_ids, test_ids = load_csv_data('project1/dataset')
 print("Preprocessing data...")
 data_annoted = data_preprocessing.read_annotated_csv('project1/dataset/data_anotated.csv')
-x_train, y_train, x_test_final = data_preprocessing.preprocess_data2(x_train_raw[:,:], y_train_raw[:], x_test_raw[:,:], data_annoted)
+x_train, y_train, x_test_final = data_preprocessing.preprocess_data(x_train_raw[:,:], y_train_raw[:], x_test_raw[:,:], data_annoted)
 
 print("Saving preprocessed data to CSV...")
-np.savetxt('project1/dataset/x_train_preprocessed.csv', x_train, delimiter=',')
-np.savetxt('project1/dataset/y_train_preprocessed.csv', y_train, delimiter=',')
-np.savetxt('project1/dataset/x_test_preprocessed.csv', x_test_final, delimiter=',')
-
+np.savetxt('project1/dataset/preprocessed/x_train_preprocessed.csv', x_train, delimiter=',')
+np.savetxt('project1/dataset/preprocessed/y_train_preprocessed.csv', y_train, delimiter=',')
+np.savetxt('project1/dataset/preprocessed/x_test_preprocessed.csv', x_test_final, delimiter=',')
 """
+
 print("Loading data...")
-x_train = np.loadtxt('project1/x_train_preprocessed.csv', delimiter=',')
-y_train = np.loadtxt('project1/y_train_preprocessed.csv', delimiter=',')
-x_test_final = np.loadtxt('project1/x_test_preprocessed.csv', delimiter=',')"""
+x_train = np.loadtxt('project1/dataset/preprocessed/x_train_preprocessed.csv', delimiter=',')
+y_train = np.loadtxt('project1/dataset/preprocessed/y_train_preprocessed.csv', delimiter=',')
+x_test_final = np.loadtxt('project1/dataset/preprocessed/x_test_preprocessed.csv', delimiter=',')
 
 
 y_train[y_train == -1] = 0
 
 print("Loading best parameters...")
-best_params_dict = helpers.load_best_params('results_cross_val_plain.csv')
+best_params_dict = load_best_params('results_cross_val_plain.csv')
 
 print("Data loaded.")
 #x_train, x_test_final, _, _, _, _, _ = PCA.PCA_threshold(x_train, x_test_final, 0.95)
@@ -47,7 +45,7 @@ max_iters = 50
 functions = {
     "least_squares": class_weighted_least_squares,
     "mse_sgd": mean_squared_error_sgd,
-    "reg_lasso_logistic": reg_logistic_lasso_subgradient,
+    "reg_lasso_logistic": reg_logistic_lasso,
     "ridge": ridge_regression,
     "logistic": logistic_regression,
     "reg_logistic": reg_logistic_regression,
@@ -95,8 +93,8 @@ for i, (model, info) in enumerate(results.items(), start=1):
 
 for model, info in results.items():
     threshold = best_thresholds[model]
-    accuracy, y_pred = implemented_functions.compute_accuracy(y_test, info["x_te"], info["weight"], model, threshold)
-    f1 = implemented_functions.compute_f1_score(y_test, y_pred)
+    accuracy, y_pred = compute_accuracy(y_test, info["x_te"], info["weight"], model, threshold)
+    f1 = compute_f1_score(y_test, y_pred)
     print(f"F1 score {model}: {f1:.4f}")
 
 
@@ -104,7 +102,7 @@ for model, info in results.items():
 for model, info in results.items():
     print("Generating predictions for test set...")
     x_test_poly = data_preprocessing.build_poly(x_test_final, int(info['degree']))
-    acc, y_pred_test = implemented_functions.compute_accuracy(None, x_test_poly, info["weight"], model, best_thresholds[model], mode = 'submission')
+    acc, y_pred_test = compute_accuracy(None, x_test_poly, info["weight"], model, best_thresholds[model], mode = 'submission')
 
     ids = [i for i in range(328135, 437513+1)]
     create_csv_submission(ids, y_pred_test, 'project1/results/submission_' + model + '.csv')
