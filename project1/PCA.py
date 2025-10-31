@@ -10,8 +10,11 @@ def mp_dim_reduction(X_tr,X_te):
     # Standardize 
     mu_tr = np.mean(X_tr, axis=0)
     sd_tr = np.std(X_tr, axis=0, ddof=1)
-    Xc_tr = (X_tr - mu_tr) / sd_tr
-    Xc_te = (X_te - mu_tr) / sd_tr
+    zero_var = (sd_tr == 0) | ~np.isfinite(sd_tr)
+    idx_kept = np.where(~zero_var)[0]
+
+    Xc_tr = (X_tr[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
+    Xc_te = (X_te[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
 
     # Correlation matrix and eigendecomposition
     S = (Xc_tr.T @ Xc_tr) / T      # correlation
@@ -50,9 +53,11 @@ def PCA_threshold(X_tr,X_te, threshold):
 
     mu_tr = np.mean(X_tr, axis=0)
     sd_tr = np.std(X_tr, axis=0, ddof=1)
+    zero_var = (sd_tr == 0) | ~np.isfinite(sd_tr)
+    idx_kept = np.where(~zero_var)[0]
 
-    Xc_tr = (X_tr - mu_tr) / sd_tr
-    Xc_te = (X_te - mu_tr) / sd_tr
+    Xc_tr = (X_tr[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
+    Xc_te = (X_te[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
     # Correlation matrix 
     S = (Xc_tr.T @ Xc_tr) / T
     eigvals, eigvecs = np.linalg.eigh(S)     

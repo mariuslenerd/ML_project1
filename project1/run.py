@@ -10,8 +10,10 @@ from helpers import *
 import PCA
 importlib.reload(PCA)
 import os
-
 """
+os.makedirs('project1/results', exist_ok=True)
+os.makedirs('project1/dataset/preprocessed', exist_ok=True)
+
 print("Loading data...")
 x_train_raw, x_test_raw,y_train_raw, train_ids, test_ids = load_csv_data('project1/dataset')
 print("Preprocessing data...")
@@ -32,25 +34,25 @@ x_test_final = np.loadtxt('project1/dataset/preprocessed/x_test_preprocessed.csv
 y_train[y_train == -1] = 0
 
 print("Loading best parameters...")
-best_params_dict = load_best_params('project1/results_cross_val_plain.csv')
+best_params_dict = load_best_params('project1/dataset/preprocessed/results_cross_val_MP.csv')
 
 print("Data loaded.")
 #x_train, x_test_final, _, _, _, _, _ = PCA.PCA_threshold(x_train, x_test_final, 0.95)
 #print(x_train.shape)
 
 x_train,x_test,y_train,y_test = data_preprocessing.split_data(x_train, y_train, 0.8, seed=1)
-max_iters = 50
+max_iters = 250
 
 functions = {
     "least_squares": class_weighted_least_squares,
+    "mse_gd": mean_squared_error_gd,
     "mse_sgd": mean_squared_error_sgd,
-    "reg_lasso_logistic": reg_logistic_lasso,
     "ridge": ridge_regression,
     "logistic": logistic_regression,
     "reg_logistic": reg_logistic_regression,
 }
 
-models = ["least_squares", "mse_sgd", "reg_lasso_logistic", "ridge", "logistic"]
+models = ["least_squares", "mse_gd","mse_sgd","ridge", "logistic", "reg_logistic"]
 
 results = {}  
 

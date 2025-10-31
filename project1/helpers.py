@@ -147,7 +147,7 @@ def compute_accuracy(y_test, x_test, w, method, threshold=0.5, mode=None, detail
         y_pred: numpy array of shape (N,), predicted binary labels (0 or 1)
     """
     
-    if method in ["logistic", "Regularized Logistic", "reg_lasso_logistic"]:
+    if method in ["logistic", "reg_logistic"]:
         y_pred = sigmoid(x_test@w)
     else:
         y_pred = x_test@w
