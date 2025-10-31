@@ -86,7 +86,7 @@ This will:
 4. Generate predictions on the test set
 5. Create submission files in `results/`
 
-The latest submission on aicrowd challenge was made using the prediction file 'submission_least_squares.csv' in the 'original' mode. 
+The latest submission on aicrowd challenge was made using the prediction file 'submission_least_squares.csv' in the 'PCA' mode. 
 
 ## 🧮 Implemented Methods
 
