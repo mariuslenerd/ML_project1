@@ -70,7 +70,9 @@ pip install numpy matplotlib
 
 ## 💻 Usage
 
-### Quick Start - Generate Predictions
+### Quick Start 
+
+First please upload the dataset to dataset/ !
 ```bash
 python run.py
 ```
