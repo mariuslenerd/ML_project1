@@ -1,48 +1,51 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from data_preprocessing import *
-import importlib
-importlib.reload(data_preprocessing)
-import cross_validation
-importlib.reload(cross_validation)
 from implemented_functions import *
 from helpers import *
+from run_cross_val import run_cross_val
+from PCA import PCA_threshold,mp_dim_reduction
+import os
+import importlib   
+import cross_validation
+importlib.reload(cross_validation)
 import PCA
 importlib.reload(PCA)
-import os
-"""
+
+
 os.makedirs('project1/results', exist_ok=True)
 os.makedirs('project1/dataset/preprocessed', exist_ok=True)
 
+
 print("Loading data...")
 x_train_raw, x_test_raw,y_train_raw, train_ids, test_ids = load_csv_data('project1/dataset')
+
 print("Preprocessing data...")
 data_annoted = data_preprocessing.read_annotated_csv('project1/dataset/data_anotated.csv')
-x_train, y_train, x_test_final = data_preprocessing.preprocess_data(x_train_raw[:,:], y_train_raw[:], x_test_raw[:,:], data_annoted)
+x_train, y_train, x_test_final = data_preprocessing.preprocess_data(x_train_raw, y_train_raw, x_test_raw, data_annoted)
+y_train[y_train == -1] = 0
+x_train,x_test,y_train,y_test = data_preprocessing.split_data(x_train, y_train, 0.8, seed=1)
+
 
 print("Saving preprocessed data to CSV...")
 np.savetxt('project1/dataset/preprocessed/x_train_preprocessed.csv', x_train, delimiter=',')
 np.savetxt('project1/dataset/preprocessed/y_train_preprocessed.csv', y_train, delimiter=',')
 np.savetxt('project1/dataset/preprocessed/x_test_preprocessed.csv', x_test_final, delimiter=',')
-"""
 
-print("Loading data...")
-x_train = np.loadtxt('project1/dataset/preprocessed/x_train_preprocessed.csv', delimiter=',')
-y_train = np.loadtxt('project1/dataset/preprocessed/y_train_preprocessed.csv', delimiter=',')
-x_test_final = np.loadtxt('project1/dataset/preprocessed/x_test_preprocessed.csv', delimiter=',')
+method = 'PCA' #choose between original, PCA or MP
 
-y_train[y_train == -1] = 0
+if method == "PCA" : 
+    x_train, x_test, x_test_final= PCA.PCA_threshold(x_train,x_test,x_test_final,0.95)
+elif method == "MP" : 
+    x_train,x_test, x_test_final = PCA.mp_dim_reduction(x_train,x_test,x_test_final)
+
+
+print("performing cross validation...")
+run_cross_val(x_train=x_train,y_train=y_train, method=method)
 
 print("Loading best parameters...")
-best_params_dict = load_best_params('project1/dataset/preprocessed/results_cross_val_MP.csv')
+best_params_dict = load_best_params(f'project1/dataset/preprocessed/results_cross_val_{method}.csv')
 
-print("Data loaded.")
-#x_train, x_test_final, _, _, _, _, _ = PCA.PCA_threshold(x_train, x_test_final, 0.95)
-#print(x_train.shape)
-
-x_train,x_test,y_train,y_test = data_preprocessing.split_data(x_train, y_train, 0.8, seed=1)
-max_iters = 250
-
+max_iters = 1500
 functions = {
     "least_squares": class_weighted_least_squares,
     "mse_gd": mean_squared_error_gd,
@@ -51,9 +54,7 @@ functions = {
     "logistic": logistic_regression,
     "reg_logistic": reg_logistic_regression,
 }
-
 models = ["least_squares", "mse_gd","mse_sgd","ridge", "logistic", "reg_logistic"]
-
 results = {}  
 
 for model in models:

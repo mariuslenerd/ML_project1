@@ -1,7 +1,7 @@
 import numpy as np
 
 # ---------- MP-based dimensionality reduction ----------
-def mp_dim_reduction(X_tr,X_te):
+def mp_dim_reduction(X_tr,X_te, X_te_fin):
     """
     Standardize, correlation,  eigendecompose, keep evals > lambda_plus.
     """
@@ -15,6 +15,7 @@ def mp_dim_reduction(X_tr,X_te):
 
     Xc_tr = (X_tr[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
     Xc_te = (X_te[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
+    Xc_te_fin = (X_te_fin[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
 
     # Correlation matrix and eigendecomposition
     S = (Xc_tr.T @ Xc_tr) / T      # correlation
@@ -34,16 +35,16 @@ def mp_dim_reduction(X_tr,X_te):
     W_mp = evecs[:, idx_mp]                
     Z_mp = Xc_tr @ W_mp # projected train data
     Z_te_mp = Xc_te @ W_mp # projected test data
-
+    Z_te_fin = Xc_te_fin @ W_mp
     EVR = evals / np.sum(evals)
     order_desc = np.argsort(evals)[::-1]
     evals_desc = evals[order_desc]
     EVR_desc = EVR[order_desc]
 
-    return Z_mp,Z_te_mp, k_mp, idx_mp, evals, EVR, evals_desc, EVR_desc, order_desc
+    return Z_mp,Z_te_mp,Z_te_fin
 
 # ---------- PCA (EVR threshold) ----------
-def PCA_threshold(X_tr,X_te, threshold):
+def PCA_threshold(X_tr,X_te,X_te_fin, threshold):
     """
     Standard PCA on correlation (standardized data), keeping the
     smallest k s.t. cumulative EVR >= threshold.
@@ -58,6 +59,7 @@ def PCA_threshold(X_tr,X_te, threshold):
 
     Xc_tr = (X_tr[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
     Xc_te = (X_te[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
+    Xc_te_fin = (X_te_fin[:,idx_kept] - mu_tr[idx_kept]) / sd_tr[idx_kept]
     # Correlation matrix 
     S = (Xc_tr.T @ Xc_tr) / T
     eigvals, eigvecs = np.linalg.eigh(S)     
@@ -74,8 +76,9 @@ def PCA_threshold(X_tr,X_te, threshold):
     W = eigvecs[:, :k]
     Z_train= Xc_tr @ W # projected train data
     Z_test = Xc_te @ W # projected test data
+    Z_te_fin = Xc_te_fin @ W
 
     idx_col = idx_desc[:k]
 
-    return Z_train,Z_test, k, idx_col, eigvals, EVR, cumEVR
+    return Z_train,Z_test,Z_te_fin
 

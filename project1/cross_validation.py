@@ -80,15 +80,6 @@ def cross_validation_single(
         )
         tr_loss = compute_reg_logistic_loss(y_tr_k, x_tr_poly, w, lambda_)
         te_loss = compute_reg_logistic_loss(y_te_k, x_te_poly, w, lambda_)
-
-    elif method == "reg_lasso_logistic":
-        # subgradient L1 solver
-        w, _ = reg_logistic_lasso_subgradient(
-            y_tr_k, x_tr_poly, lambda_, initial_w, max_iters, gamma
-        )
-        tr_loss = compute_reg_logistic_loss_l1(y_tr_k, x_tr_poly, w, lambda_)
-        te_loss = compute_reg_logistic_loss_l1(y_te_k, x_te_poly, w, lambda_)
-
     else:
         raise ValueError(f"Unknown method {method}")
 
@@ -154,7 +145,6 @@ def cross_validation_demo_all(
         "ridge":                {"need_lambda": True,  "need_gamma": False},
         "logistic":             {"need_lambda": False, "need_gamma": True},
         "reg_logistic":         {"need_lambda": True,  "need_gamma": True},
-        "reg_lasso_logistic":   {"need_lambda": True,  "need_gamma": True},
     }
 
     methods = list(method_specs.keys())
