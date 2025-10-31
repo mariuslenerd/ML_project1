@@ -66,10 +66,7 @@ def preprocess_data(x_train_raw, y_train, x_test_raw, annotated_data, important_
         x_train, categories_list = clean_data(x_train_filtered, annotated_data)
         x_test,categories_list = clean_data(x_test_filtered, annotated_data,test = True,categories_list = categories_list)
 
-        #np.savetxt('data_train.csv', data_train, delimiter=',')
-        #np.savetxt('data_test.csv', data_test, delimiter=',')
-        # uncomment next line to balance the dataset
-        #x_train, y_train = balance_data(y_train, data_train)
+      
 
     x_train, x_test = remove_constant_variance(x_train, x_test)
     x_train = np.hstack((np.ones((x_train.shape[0],1)), x_train))
@@ -170,9 +167,8 @@ def clean_data(data, data_annotated, test = False, categories_list = None, impor
         data_clean (np.ndarray) : Fully processed dataset with encoded categorical variables and normalized numerical features
     """
     #Remove useless features : 
-    #data_annotated = data_annotated[data_annotated[:,0] != '0'] 
-
     if important_feat_only is True : 
+        #Identify categorical and numerical features : 
         idx_categorical = np.where(((data_annotated[:,1] != '0') | (data_annotated[:,2]!= '0')) & (data_annotated[:,7] == '1'))[0]
         idx_numerical = np.where((data_annotated[:,3]!= '0')& (data_annotated[:,7]== '1'))[0]     
                             
@@ -330,7 +326,21 @@ def one_hot_encode(data,data_annoted, categories = None) :
 
 def balance_data(y, x):
     """
-    The goal of this function is to undersample the majority class (in our case no heart attack). We will choose random lines from the majority class to be removed
+    Balances a binary dataset by randomly undersampling the majority class
+
+    This function ensures that both classes (e.g., positive and negative samples)
+    have an equal number of observations by randomly removing samples from the 
+    majority class. It is particularly useful when dealing with imbalanced datasets 
+    where one class is significantly overrepresented and avoids the models to be
+    biased toward the majority class
+
+    Args : 
+        - y (np.ndarray) : target labels
+        - x (np.ndarray) : feature matrix corresponding to the y samples
+    
+    Returns : 
+        - x balanced (np.ndarray) : feature matrix with balanced dataset
+        - y balanced (np.ndarray) : target labels after balancing the dataset
     """
     #Set Seed to have reproducible results when using random choices
     rng = np.random.default_rng(seed=42) 
