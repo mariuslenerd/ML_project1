@@ -147,7 +147,7 @@ def remove_useless(data: np.ndarray, annotated_data: np.ndarray) -> np.ndarray:
     return data[:, mask], mask
 
 
-def clean_data(data, data_annotated, test = False, categories_list = None, important_feat_only = False) :
+def clean_data(data, annotated_data, test = False, categories_list = None, important_feat_only = False) :
     """
     Cleans and processes the dataset by separating,transforming and merging back categorical and numerical features. 
     
@@ -169,19 +169,19 @@ def clean_data(data, data_annotated, test = False, categories_list = None, impor
     #Remove useless features : 
     if important_feat_only is True : 
         #Identify categorical and numerical features : 
-        idx_categorical = np.where(((data_annotated[:,1] != '0') | (data_annotated[:,2]!= '0')) & (data_annotated[:,7] == '1'))[0]
-        idx_numerical = np.where((data_annotated[:,3]!= '0')& (data_annotated[:,7]== '1'))[0]     
+        idx_categorical = np.where(((annotated_data[:,1] != '0') | (annotated_data[:,2]!= '0')) & (annotated_data[:,7] == '1'))[0]
+        idx_numerical = np.where((annotated_data[:,3]!= '0')& (annotated_data[:,7]== '1'))[0]     
                             
     else : 
         #Identify categorical and numerical features : 
-        idx_categorical = np.where((data_annotated[:,1] != '0') | (data_annotated[:,2]!= '0'))[0]
-        idx_numerical = np.where(data_annotated[:,3]!= '0')[0]
+        idx_categorical = np.where((annotated_data[:,1] != '0') | (annotated_data[:,2]!= '0'))[0]
+        idx_numerical = np.where(annotated_data[:,3]!= '0')[0]
     
     #Split Data into separate categories (numerical and categorical)
     data_categorical = data[:,idx_categorical] 
     data_numerical = data[:,idx_numerical] 
-    data_annotated_categorical = data_annotated[idx_categorical,:] 
-    data_annotated_numerical = data_annotated[idx_numerical,:]
+    data_annotated_categorical = annotated_data[idx_categorical,:] 
+    data_annotated_numerical = annotated_data[idx_numerical,:]
 
     #Handle special values 
     data_numerical =  deal_with_specials(data_annotated_numerical, data_numerical)
@@ -205,7 +205,7 @@ def clean_data(data, data_annotated, test = False, categories_list = None, impor
     
     return data_clean,categories_list
 
-def deal_with_specials(data_annoted, data):
+def deal_with_specials(annotated_data, data):
     """
     Replaces special or invalid feature values (e.g., "don't know", "prefer not to say") with NaN.
 
@@ -222,9 +222,9 @@ def deal_with_specials(data_annoted, data):
         data (np.ndarray): Modified dataset with all special values replaced by NaN.
     """
 
-    for index in range(len(data_annoted)): 
+    for index in range(len(annotated_data)): 
         #Get the special values (dont know & prefer not to say) which are stored in the 5th column of 'data_annoted'
-        special_vals = data_annoted[index,4] 
+        special_vals = annotated_data[index,4] 
 
        #Split the special values when there are more than one 
         special_val = special_vals.split('&') 
@@ -256,7 +256,7 @@ def normalize_data(data):
     return data
 
 
-def one_hot_encode(data,data_annoted, categories = None) : 
+def one_hot_encode(data,annotated_data, categories = None) : 
     """
     One-hot encodes categorical features using the annotated dataset ('data_annoted')
 
@@ -283,11 +283,11 @@ def one_hot_encode(data,data_annoted, categories = None) :
     """
     categories_list = []
     one_hot_features = []
-    n_feat = len(data_annoted)
+    n_feat = len(annotated_data)
     for index in range(n_feat): 
 
         #Extract nb of categories of each feature which is stored in data_annoted
-        n = float(data_annoted[index,6]) 
+        n = float(annotated_data[index,6]) 
 
         #Select all samples from the feature we currently are one-hot encoding
         feature = data[:,index] 
