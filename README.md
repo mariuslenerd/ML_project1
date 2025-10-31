@@ -73,7 +73,7 @@ pip install numpy matplotlib
 ### Quick Start 
 
 **Before running the code:**
-1. First please upload the dataset to 'dataset/'
+1. First please upload the dataset to 'dataset/'. It should then contain the 3 files: 'x_train.csv', 'x_test.csv', 'y_train.csv'.
 2. Choose the method between 'original', 'PCA' and 'MP'. By default 'original' is chosen.
    
 ```bash
