@@ -151,7 +151,7 @@ def clean_data(data, annotated_data, test = False, categories_list = None, impor
     """
     Cleans and processes the dataset by separating,transforming and merging back categorical and numerical features. 
     
-    This function uses an annotated dataset ('data_annoted') which contains relevant informations concerning the features
+    This function uses an annotated dataset ('data_annotated') which contains relevant informations concerning the features
     such as relevance (coded by binary yes/no), type (categorical,numerical), special formats, nb of categories for categorical features.
 
     This was done in order to : 
@@ -162,7 +162,7 @@ def clean_data(data, annotated_data, test = False, categories_list = None, impor
         - Merge back the categorical and numerical datasets once they've been cleaned 
     Args: 
         data (np.ndarray) : Original dataset containing all the features
-        data_annoted (np.ndarray) : Annotated dataset containing all the relevant informations about the features
+        data_annotated (np.ndarray) : Annotated dataset containing all the relevant informations about the features
     Returns : 
         data_clean (np.ndarray) : Fully processed dataset with encoded categorical variables and normalized numerical features
     """
@@ -209,7 +209,7 @@ def deal_with_specials(annotated_data, data):
     """
     Replaces special or invalid feature values (e.g., "don't know", "prefer not to say") with NaN.
 
-    This function uses the annotated dataset (`data_annoted`) to identify special numeric codes 
+    This function uses the annotated dataset (`data_annotated`) to identify special numeric codes 
     for each feature (stored in the 5th column). These codes are replaced by NaN in the corresponding 
     columns of the main dataset.
 
@@ -223,7 +223,7 @@ def deal_with_specials(annotated_data, data):
     """
 
     for index in range(len(annotated_data)): 
-        #Get the special values (dont know & prefer not to say) which are stored in the 5th column of 'data_annoted'
+        #Get the special values (dont know & prefer not to say) which are stored in the 5th column of 'data_annotated'
         special_vals = annotated_data[index,4] 
 
        #Split the special values when there are more than one 
@@ -258,7 +258,7 @@ def normalize_data(data):
 
 def one_hot_encode(data,annotated_data, categories = None) : 
     """
-    One-hot encodes categorical features using the annotated dataset ('data_annoted')
+    One-hot encodes categorical features using the annotated dataset ('data_annotated')
 
     This function transforms each categorical feature into a one-hot encoded representation. 
     The number of category for each feature is known thanks to the annotated dataset. 
@@ -271,7 +271,7 @@ def one_hot_encode(data,annotated_data, categories = None) :
 
     Args : 
         - data (np.ndarray) : Categorical data to be one-hot encoded
-        - data_annoted (np.ndarray) : Annotated data for each feature,
+        - data_annotated (np.ndarray) : Annotated data for each feature,
           where the 7th column contains the nb of categories of each feature 
         - categories (np.ndarray) : Predefined categories for each feature to avoid any mismatch in the dimensions 
         of train and test sets. If None, categories are inferred from the data 
@@ -286,7 +286,7 @@ def one_hot_encode(data,annotated_data, categories = None) :
     n_feat = len(annotated_data)
     for index in range(n_feat): 
 
-        #Extract nb of categories of each feature which is stored in data_annoted
+        #Extract nb of categories of each feature which is stored in data_annotated
         n = float(annotated_data[index,6]) 
 
         #Select all samples from the feature we currently are one-hot encoding
