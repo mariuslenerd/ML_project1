@@ -72,7 +72,10 @@ pip install numpy matplotlib
 
 ### Quick Start 
 
-First please upload the dataset to dataset/ !
+**Before running the code:**
+1. First please upload the dataset to 'dataset/'
+2. Choose the method between 'original', 'PCA' and 'MP'. By default 'original' is chosen.
+   
 ```bash
 python run.py
 ```
