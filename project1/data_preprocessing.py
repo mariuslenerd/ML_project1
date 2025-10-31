@@ -71,9 +71,26 @@ def preprocess_data(x_train_raw, y_train, x_test_raw, annotated_data, important_
         # uncomment next line to balance the dataset
         #x_train, y_train = balance_data(y_train, data_train)
 
+    x_train, x_test = remove_constant_variance(x_train, x_test)
     x_train = np.hstack((np.ones((x_train.shape[0],1)), x_train))
     x_test = np.hstack((np.ones((x_test.shape[0],1)), x_test))
     return x_train, y_train, x_test
+
+def remove_constant_variance(x_train, x_test):
+    """Removes features with constant variance from the dataset.
+
+    Args:
+        x_train (np.ndarray): The training data array.
+        x_test (np.ndarray): The testing data array.
+    Returns:
+        np.ndarray, np.ndarray: The training and testing data arrays with constant variance features removed.
+        mask (np.ndarray): Boolean mask indicating which features were retained.
+        """
+    var = np.var(x_train, axis=0)
+    mask = var != 0
+    x_train = x_train[:, mask]
+    x_test = x_test[:, mask]
+    return x_train, x_test
 
 def remove_nan(x_train, x_test, annotated_data):
     """

@@ -11,8 +11,8 @@ import PCA
 importlib.reload(PCA)
 import os
 
-
-"""print("Loading data...")
+"""
+print("Loading data...")
 x_train_raw, x_test_raw,y_train_raw, train_ids, test_ids = load_csv_data('project1/dataset')
 print("Preprocessing data...")
 data_annoted = data_preprocessing.read_annotated_csv('project1/dataset/data_anotated.csv')
@@ -29,11 +29,10 @@ x_train = np.loadtxt('project1/dataset/preprocessed/x_train_preprocessed.csv', d
 y_train = np.loadtxt('project1/dataset/preprocessed/y_train_preprocessed.csv', delimiter=',')
 x_test_final = np.loadtxt('project1/dataset/preprocessed/x_test_preprocessed.csv', delimiter=',')
 
-
 y_train[y_train == -1] = 0
 
 print("Loading best parameters...")
-best_params_dict = load_best_params('results_cross_val_plain.csv')
+best_params_dict = load_best_params('project1/results_cross_val_plain.csv')
 
 print("Data loaded.")
 #x_train, x_test_final, _, _, _, _, _ = PCA.PCA_threshold(x_train, x_test_final, 0.95)
